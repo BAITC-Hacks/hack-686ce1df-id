@@ -1,4 +1,4 @@
-"""Schema-first inspection and input audit; never publishes a complete run."""
+"""Schema inspection, preliminary audit, and complete analytics calculation."""
 
 from __future__ import annotations
 
@@ -105,9 +105,22 @@ def main(argv: list[str] | None = None) -> int:
     audit.add_argument("--mapping", required=True, type=Path)
     audit.add_argument("--self-transfers", choices=("include", "exclude"), required=True)
     audit.add_argument("--output", type=Path, help="Новый файл отчёта; по умолчанию stdout")
+    run = commands.add_parser("run", help="Полный расчёт и запись артефактов приложения и CSV задания")
+    run.add_argument("--input-dir", required=True, type=Path)
+    run.add_argument("--output-dir", type=Path, default=Path("artifacts"))
+    run.add_argument("--mapping", type=Path, default=Path("config/input_mapping.json"))
+    run.add_argument("--rules", type=Path, default=Path("config/rules.json"))
     args = parser.parse_args(argv)
     started = perf_counter()
     try:
+        if args.command == "run":
+            from .pipeline import run_pipeline
+            manifest = run_pipeline(args.input_dir, args.output_dir, args.rules, args.mapping)
+            print(json.dumps({"status": "complete", "run_id": manifest.run_id,
+                              "run_dir": str((args.output_dir / manifest.run_id).resolve()),
+                              "counts": manifest.counts, "elapsed_seconds": perf_counter() - started},
+                             ensure_ascii=False, allow_nan=False))
+            return 0
         if args.command == "inspect":
             result = {"status": "schema_only", **inspect_schemas(args.input_dir)}
         else:
@@ -125,7 +138,7 @@ def main(argv: list[str] | None = None) -> int:
         failure = {"status": "failed", "error": str(error)}
         if isinstance(error, InputValidationError) and error.audit:
             failure["audit"] = error.audit
-        if args.output and not args.output.exists():
+        if getattr(args, "output", None) and not args.output.exists():
             try:
                 _write_report(args.output, failure)
             except OSError as output_error:

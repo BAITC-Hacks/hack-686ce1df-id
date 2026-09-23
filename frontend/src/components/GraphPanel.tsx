@@ -1,3 +1,4 @@
+import { EMPTY_NAMES, nodeLabel } from '../names';
 import { useEffect, useId, useRef } from 'react';
 import cytoscape, { type Core, type ElementDefinition, type EventObject } from 'cytoscape';
 import { ArrowRight, Expand, LoaderCircle, Minus, Network, Plus, RotateCcw } from 'lucide-react';
@@ -6,6 +7,7 @@ import { ROLE_COLORS, ROLE_LABELS } from '../format';
 
 interface GraphPanelProps {
   graph: GraphResponse | null;
+  names?: ReadonlyMap<string, string>;
   selectedGid: string | null;
   loading: boolean;
   onSelectNode: (gid: string) => void;
@@ -81,7 +83,7 @@ function fitGraph(cy: Core) {
   }
 }
 
-export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, onRadiusChange, scopeLabel, error, onRetry }: GraphPanelProps) {
+export function GraphPanel({ graph, names = EMPTY_NAMES, selectedGid, loading, onSelectNode, radius, onRadiusChange, scopeLabel, error, onRetry }: GraphPanelProps) {
   const canvasRef = useRef<HTMLDivElement>(null);
   const cyRef = useRef<Core | null>(null);
   const topologyRef = useRef<string | null>(null);
@@ -148,7 +150,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
           style: {
             width: 32,
             height: 32,
-            label: 'data(gid)',
+            label: 'data(label)',
             'border-width': 4,
             'border-color': '#254edb',
             'outline-color': '#dce6ff',
@@ -159,7 +161,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
         },
         {
           selector: 'node.is-hovered',
-          style: { label: 'data(gid)', 'border-color': '#7189b5', 'z-index': 20 },
+          style: { label: 'data(label)', 'border-color': '#7189b5', 'z-index': 20 },
         },
         {
           selector: 'edge.is-adjacent',
@@ -175,10 +177,12 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
       if (disabledRef.current) return;
       event.target.addClass('is-hovered');
       container.style.cursor = 'pointer';
+      container.title = event.target.data('title') as string;
     };
     const leave = (event: EventObject) => {
       event.target.removeClass('is-hovered');
       container.style.cursor = '';
+      container.title = '';
     };
     cy.on('tap', 'node', select);
     cy.on('mouseover', 'node', enter);
@@ -205,6 +209,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
       topologyRef.current = null;
       return;
     }
+    const shortLabel = (gid: string) => { const label = names.get(gid) ?? gid; return label.length > 26 ? `${label.slice(0, 25)}…` : label; };
     const topology = JSON.stringify([
       graph.run_id,
       graph.nodes.map((node) => node.gid).sort(compareIds),
@@ -212,14 +217,14 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
     ]);
     if (topologyRef.current === topology) {
       cy.batch(() => {
-        for (const node of graph.nodes) cy.getElementById(nodeId(node.gid)).data('color', ROLE_COLORS[node.role]);
+        for (const node of graph.nodes) cy.getElementById(nodeId(node.gid)).data({ color: ROLE_COLORS[node.role], label: shortLabel(node.gid), title: nodeLabel(node.gid, names) });
       });
       return;
     }
     const positions = positionsFor(graph);
     const elements: ElementDefinition[] = [
       ...[...graph.nodes].sort((a, b) => compareIds(a.gid, b.gid)).map((node) => ({
-        data: { id: nodeId(node.gid), gid: node.gid, color: ROLE_COLORS[node.role] },
+        data: { id: nodeId(node.gid), gid: node.gid, color: ROLE_COLORS[node.role], label: shortLabel(node.gid), title: nodeLabel(node.gid, names) },
         position: positions.get(nodeId(node.gid)),
       })),
       ...graph.edges.map((edge) => ({
@@ -233,7 +238,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
     topologyRef.current = topology;
     cy.resize();
     fitGraph(cy);
-  }, [graph]);
+  }, [graph, names]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -314,7 +319,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
             <select id={selectorId} value={graph?.nodes.some((node) => node.gid === selectedGid) ? selectedGid ?? '' : ''}
               disabled={loading || Boolean(error)} onChange={(event) => { if (event.target.value) onSelectNode(event.target.value); }}>
               <option value="" disabled>Выберите gid</option>
-              {graph?.nodes.map((node) => <option key={node.gid} value={node.gid}>{node.gid} — {ROLE_LABELS[node.role]}{node.assignment_status === 'insufficient_evidence' ? ' (недостаточно данных)' : ''}</option>)}
+              {graph?.nodes.map((node) => <option key={node.gid} value={node.gid}>{nodeLabel(node.gid, names)} — {ROLE_LABELS[node.role]}{node.assignment_status === 'insufficient_evidence' ? ' (недостаточно данных)' : ''}</option>)}
             </select>
           </details>
         ) : null}

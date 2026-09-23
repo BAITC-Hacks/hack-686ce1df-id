@@ -4,6 +4,7 @@ import type { Evidence, NodeRecord } from '../types/api';
 
 type NodeDetailsProps = {
   node: NodeRecord;
+  displayName?: string;
   onSelectCluster: (id: string) => void;
   onSelectComponent: (id: string) => void;
 };
@@ -16,6 +17,10 @@ const METRIC_LABELS: Record<string, string> = {
   in_amount_kzt: 'Сумма входящих',
   out_amount_kzt: 'Сумма исходящих',
   out_in_ratio: 'Исходящие / входящие',
+  volume_kzt: 'Общий объём',
+  degree: 'Связи, вход + выход',
+  transactions: 'Операции, вход + выход',
+  priority_score: 'Приоритет проверки',
   is_seed: 'Исходный узел',
   hop_depth: 'Глубина обхода',
   outbound_censored: 'Исходящие ограничены обходом',
@@ -65,14 +70,14 @@ function EvidenceTable({ evidence, label }: { evidence: Evidence[]; label: strin
   );
 }
 
-export function NodeDetails({ node, onSelectCluster, onSelectComponent }: NodeDetailsProps) {
+export function NodeDetails({ node, displayName, onSelectCluster, onSelectComponent }: NodeDetailsProps) {
   const { metrics, quality } = node;
   const insufficient = node.assignment_status === 'insufficient_evidence';
 
   return (
     <article className="node-details">
       <header className="detail-header">
-        <div><p className="eyebrow">Карточка узла</p><h2 className="detail-title">{node.gid}</h2></div>
+        <div><p className="eyebrow">Карточка узла</p><h2 className="detail-title" title={displayName}>{displayName ?? node.gid}</h2>{displayName ? <p className="node-gid">ID: {node.gid}</p> : null}</div>
         <span className="role-badge" style={{ color: ROLE_COLORS[node.role] }}><span className="role-dot" style={{ background: ROLE_COLORS[node.role] }} />{ROLE_LABELS[node.role]}</span>
       </header>
 

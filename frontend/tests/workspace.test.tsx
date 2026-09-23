@@ -3,6 +3,8 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, ApiError } from '../src/api/client';
+import { demoApi } from '../src/api/demo';
+import { disabledDemo } from '../src/types/demo';
 import { formatMoney, formatNumber, formatValue } from '../src/format';
 import { useWorkspace } from '../src/state/useWorkspace';
 import type { GraphResponse, HealthResult, NodeRecord, NodeResponse } from '../src/types/api';
@@ -77,6 +79,7 @@ async function readyWorkspace() {
 }
 
 beforeEach(() => {
+  vi.spyOn(demoApi, 'info').mockResolvedValue(disabledDemo(INITIAL_RUN));
   vi.spyOn(api, 'health').mockResolvedValue(healthResponse());
   vi.spyOn(api, 'priorities').mockResolvedValue({
     contract_version: '1.0', run_id: INITIAL_RUN, items: [makeNode('0007')], total: 1,
@@ -106,8 +109,8 @@ describe('workspace selection across asynchronous API responses', () => {
     vi.mocked(api.node).mockImplementation((gid) => gid === 'A' ? nodeA.promise : nodeB.promise);
     vi.mocked(api.graph).mockImplementation((query) => query.gid === 'A' ? graphA.promise : graphB.promise);
     const { result } = await readyWorkspace();
-    let firstRequest!: Promise<void>;
-    let secondRequest!: Promise<void>;
+    let firstRequest!: Promise<boolean>;
+    let secondRequest!: Promise<boolean>;
 
     act(() => { firstRequest = result.current.select({ kind: 'node', id: 'A' }); });
     const firstSignal = vi.mocked(api.node).mock.calls[0][1];
@@ -144,6 +147,7 @@ describe('workspace selection across asynchronous API responses', () => {
       // Pause refresh to observe that old data disappears before the new run arrives.
       const nextHealth = deferred<HealthResult>();
       vi.mocked(api.health).mockReturnValueOnce(nextHealth.promise);
+      vi.mocked(demoApi.info).mockResolvedValue(disabledDemo(NEXT_RUN));
       vi.mocked(api.priorities).mockResolvedValue({
         contract_version: '1.0', run_id: NEXT_RUN, items: [makeNode('fresh-node')], total: 1,
       });

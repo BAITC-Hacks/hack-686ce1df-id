@@ -269,3 +269,96 @@ def test_empty_parquet_tables_are_valid_and_audited(inputs):
 def test_missing_input_directory_has_human_error(tmp_path):
     with pytest.raises(InputValidationError, match="Input directory does not exist"):
         inspect_schemas(tmp_path / "missing")
+
+
+def test_explicit_float_policy_preserves_decimal_cents_and_input_bytes(inputs):
+    directory, mapping = inputs({
+        "edges": {"sender": ["0007"], "receiver": ["7"], "kzt": [0.3], "n": [2]},
+        "transactions": {"sender": ["0007", "0007"], "receiver": ["7", "7"], "kzt": [0.1, 0.2]},
+    })
+    before = {path.name: path.read_bytes() for path in directory.glob("*.parquet")}
+    mapping["money"]["float_policy"] = "decimal_string"
+    _, edges, audit = load_inputs(directory, mapping, "include")
+    assert edges[0]["amount_kzt"] == "0.30"
+    assert audit["reconciliation"]["status"] == "match"
+    assert audit["money"]["float_policy"] == "decimal_string"
+    assert before == {path.name: path.read_bytes() for path in directory.glob("*.parquet")}
+
+
+@pytest.mark.parametrize("value", [float("nan"), float("inf"), -0.01, 0.001, 0.1 + 0.2, float(2**53), float(2**46)])
+def test_float_policy_never_rounds_or_accepts_unsafe_precision(inputs, value):
+    directory, mapping = inputs({"edges": {"sender": ["0007"], "receiver": ["7"], "kzt": [value], "n": [2]}})
+    mapping["money"]["float_policy"] = "decimal_string"
+    with pytest.raises(InputValidationError, match=r"e.parquet: row 1, field amount"):
+        load_inputs(directory, mapping, "include")
+
+
+@pytest.mark.parametrize("policy", ["round", "allow", [], None])
+def test_invalid_float_policy_is_rejected(inputs, policy):
+    directory, mapping = inputs()
+    mapping["money"]["float_policy"] = policy
+    with pytest.raises(InputValidationError, match="float_policy"):
+        load_inputs(directory, mapping, "include")
+
+
+def _reviewed_traversal(mapping, max_depth=1):
+    mapping["traversal"] = {"strategy": "outgoing_bfs", "max_depth": max_depth, "source": "synthetic collection documentation"}
+    mapping["tables"]["nodes"]["columns"].update({"is_seed": "seed", "hop_depth": "depth"})
+
+
+def test_reviewed_traversal_distinguishes_boundary_and_unknown_incoming(inputs):
+    directory, mapping = inputs({"nodes": {"customer": ["0007", "7", "isolate"], "seed": [True, False, True], "depth": [0, 1, 0]}})
+    _reviewed_traversal(mapping)
+    nodes, _, audit = load_inputs(directory, mapping, "include")
+    qualities = {node["gid"]: node["quality"] for node in nodes}
+    assert qualities["0007"]["outbound_censored"] is False
+    assert qualities["0007"]["inbound_incomplete"] is True
+    assert qualities["7"]["outbound_censored"] is True
+    assert qualities["7"]["inbound_incomplete"] is None
+    assert audit["quality_sources"]["outbound_censored"]["inferred"] is True
+    assert audit["quality_sources"]["hop_depth"]["inferred"] is False
+    assert audit["counts"]["isolated_nodes"] == 1
+    assert "неизвестна" in " ".join(qualities["7"]["reasons"])
+
+
+@pytest.mark.parametrize(("seeds", "depths", "message"), [
+    ([False, False, True], [0, 1, 0], "is_seed"),
+    ([True, True, True], [0, 1, 0], "is_seed"),
+    ([True, False, True], [0, 2, 0], "max_depth"),
+    ([True, False, True], [0, None, 0], "non-null"),
+    ([True, None, True], [0, 1, 0], "non-null"),
+    ([True, False, False], [0, 1, 1], "observed outgoing BFS distance"),
+])
+def test_reviewed_traversal_rejects_inconsistent_node_depths(inputs, seeds, depths, message):
+    directory, mapping = inputs({"nodes": {"customer": ["0007", "7", "isolate"], "seed": seeds, "depth": depths}})
+    _reviewed_traversal(mapping)
+    with pytest.raises(InputValidationError, match=message):
+        load_inputs(directory, mapping, "include")
+
+
+@pytest.mark.parametrize(("field", "value"), [("strategy", "incoming_bfs"), ("max_depth", 0), ("max_depth", True), ("max_depth", 1.0), ("source", "")])
+def test_invalid_traversal_metadata_is_rejected(inputs, field, value):
+    directory, mapping = inputs({"nodes": {"customer": ["0007", "7", "isolate"], "seed": [True, False, True], "depth": [0, 1, 0]}})
+    _reviewed_traversal(mapping)
+    mapping["traversal"][field] = value
+    with pytest.raises(InputValidationError, match=f"traversal.{field}"):
+        load_inputs(directory, mapping, "include")
+
+
+def test_reviewed_traversal_rejects_outgoing_boundary_pair(inputs):
+    directory, mapping = inputs({
+        "nodes": {"customer": ["0007", "7", "isolate"], "seed": [False, True, True], "depth": [1, 0, 0]},
+    })
+    _reviewed_traversal(mapping)
+    with pytest.raises(InputValidationError, match="outgoing pair from boundary"):
+        load_inputs(directory, mapping, "include")
+
+
+def test_reviewed_traversal_rejects_shortcut_depth_and_conflicting_quality(inputs):
+    directory, mapping = inputs({"nodes": {"customer": ["0007", "7", "isolate"], "seed": [True, False, True], "depth": [0, 2, 0], "censored": [True, True, False]}})
+    _reviewed_traversal(mapping, max_depth=2)
+    with pytest.raises(InputValidationError, match="minimum BFS hop_depth"):
+        load_inputs(directory, mapping, "include")
+    mapping["tables"]["nodes"]["columns"]["outbound_censored"] = "censored"
+    with pytest.raises(InputValidationError, match="explicit flag conflicts"):
+        load_inputs(directory, mapping, "include")

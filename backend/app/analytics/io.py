@@ -6,8 +6,10 @@ schemas is possible before an input mapping is approved.
 
 from __future__ import annotations
 
-from collections import Counter
+from collections import Counter, deque
+from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
+import math
 from pathlib import Path
 import re
 from typing import Any
@@ -74,8 +76,8 @@ def _mapping_tables(mapping: dict, schemas: dict, audit: dict) -> dict:
     money = mapping.get("money")
     if not isinstance(money, dict) or money.get("unit") != "KZT" or type(money.get("scale")) is not int or money.get("scale") != 2:
         _fail(audit, "input_mapping.money: supported exact representation is {'unit': 'KZT', 'scale': 2}")
-    if money.get("float_policy", "reject") != "reject":
-        _fail(audit, "input_mapping.money.float_policy: only 'reject' is supported; map exact decimal/integer/string source values")
+    if money.get("float_policy", "reject") not in ("reject", "decimal_string"):
+        _fail(audit, "input_mapping.money.float_policy: choose 'reject' or explicitly approve 'decimal_string'")
     if mapping.get("amount_source") not in ("edges", "transactions"):
         _fail(audit, "input_mapping.amount_source: explicitly choose 'edges' or 'transactions'")
     if mapping.get("reconciliation") not in ("error", "report"):
@@ -112,6 +114,8 @@ def _mapping_tables(mapping: dict, schemas: dict, audit: dict) -> dict:
             if kind == "aggregate":
                 required.add("tx_count")
             allowed = required | {"id"}
+            if kind == "event":
+                allowed.add("date")
         if required - columns.keys():
             _fail(audit, f"{filename}: missing canonical mapping field(s): {', '.join(sorted(required - columns.keys()))}")
         if columns.keys() - allowed:
@@ -129,6 +133,62 @@ def _mapping_tables(mapping: dict, schemas: dict, audit: dict) -> dict:
     return tables
 
 
+def _calendar_date(value: Any, where: str, audit: dict) -> date:
+    """Calendar dates have no implicit timestamp truncation or timezone change."""
+    if isinstance(value, date) and not isinstance(value, datetime):
+        return value
+    if isinstance(value, str) and re.fullmatch(r"\d{4}-\d{2}-\d{2}", value):
+        try:
+            return date.fromisoformat(value)
+        except ValueError:
+            pass
+    _fail(audit, f"{where}: expected a calendar date or ISO YYYY-MM-DD string; received {value!r}; timestamps are not silently truncated")
+
+
+def _observation(mapping: dict, tables: dict, audit: dict) -> dict | None:
+    observation = mapping.get("observation")
+    dated = any("date" in table["columns"] for table in tables.values())
+    if observation is None and not dated:
+        return None
+    if not isinstance(observation, dict) or observation.get("date_semantics") != "calendar_date":
+        _fail(audit, "input_mapping.observation.date_semantics: mapped dates require explicit 'calendar_date' semantics and period bounds")
+    start = _calendar_date(observation.get("start_date"), "input_mapping.observation.start_date", audit)
+    end = _calendar_date(observation.get("end_date"), "input_mapping.observation.end_date", audit)
+    if start > end:
+        _fail(audit, "input_mapping.observation: start_date must not be after end_date")
+    if not dated:
+        _fail(audit, "input_mapping.observation: map a date column to validate the declared period")
+    minimum = observation.get("minimum_transaction_kzt")
+    if minimum is not None:
+        minimum = _amount(minimum, "input_mapping.observation.minimum_transaction_kzt", audit)
+    return {"start_date": start, "end_date": end, "minimum_transaction_minor_units": minimum}
+
+
+def _event_date(row: dict, table: dict, observation: dict | None, where: str, audit: dict) -> date | None:
+    column = table["columns"].get("date")
+    if column is None:
+        return None
+    value = _calendar_date(row[column], f"{where}, field date ({column})", audit)
+    if observation is None or not observation["start_date"] <= value <= observation["end_date"]:
+        _fail(audit, f"{where}, field date ({column}): {value} is outside the approved observation period")
+    return value
+
+
+def _traversal(mapping: dict, tables: dict, audit: dict) -> dict | None:
+    traversal = mapping.get("traversal")
+    if traversal is None:
+        return None
+    if not isinstance(traversal, dict) or traversal.get("strategy") != "outgoing_bfs":
+        _fail(audit, "input_mapping.traversal.strategy: supported reviewed strategy is 'outgoing_bfs'")
+    if type(traversal.get("max_depth")) is not int or traversal["max_depth"] < 1:
+        _fail(audit, "input_mapping.traversal.max_depth: expected a positive integer")
+    if not isinstance(traversal.get("source"), str) or not traversal["source"].strip():
+        _fail(audit, "input_mapping.traversal.source: a nonempty provenance description is required")
+    if {"is_seed", "hop_depth"} - tables["nodes"]["columns"].keys():
+        _fail(audit, "input_mapping.traversal: explicit is_seed and hop_depth source columns are required")
+    return traversal
+
+
 def _gid(value: Any, expected: str, where: str, audit: dict) -> str:
     if expected == "string" and isinstance(value, str) and value and value.strip() == value:
         return value
@@ -143,7 +203,13 @@ def _count(value: Any, where: str, audit: dict) -> int:
     return value
 
 
-def _amount(value: Any, where: str, audit: dict) -> int:
+def _amount(value: Any, where: str, audit: dict, float_policy: str = "reject") -> int:
+    if isinstance(value, float) and float_policy == "decimal_string":
+        if not math.isfinite(value) or value < 0:
+            _fail(audit, f"{where}: amount must be finite and nonnegative; received {value!r}")
+        if abs(value) >= 2**53 or math.ulp(value) > 0.01:
+            _fail(audit, f"{where}: unsafe float precision for KZT cents; received {value!r}; exact original money cannot be recovered")
+        value = str(value)
     if isinstance(value, bool) or isinstance(value, float) or not isinstance(value, (str, int, Decimal)):
         _fail(audit, f"{where}: money must be exact decimal, integer KZT, or decimal string; received {value!r} ({type(value).__name__}); binary floats are rejected")
     if isinstance(value, str) and not _DECIMAL_STRING.fullmatch(value):
@@ -175,7 +241,7 @@ def _read_rows(input_dir: Path, table: dict, audit: dict) -> list[dict]:
         _fail(audit, f"{filename}: cannot read mapped Parquet columns: {exc}")
 
 
-def _read_nodes(input_dir: Path, table: dict, audit: dict) -> list[dict]:
+def _read_nodes(input_dir: Path, table: dict, audit: dict, traversal: dict | None = None, observation: dict | None = None) -> list[dict]:
     columns = table["columns"]
     nodes = []
     seen: dict[str, int] = {}
@@ -188,7 +254,8 @@ def _read_nodes(input_dir: Path, table: dict, audit: dict) -> list[dict]:
         quality = {"is_seed": None, "hop_depth": None, "outbound_censored": None, "inbound_incomplete": None, "reasons": []}
         for field in ("is_seed", "hop_depth", "outbound_censored", "inbound_incomplete"):
             if field not in columns:
-                quality["reasons"].append(f"{field}: no explicit source column mapped; value is unknown")
+                if traversal is None or field not in ("outbound_censored", "inbound_incomplete"):
+                    quality["reasons"].append(f"{field}: no explicit source column mapped; value is unknown")
                 continue
             value = row[columns[field]]
             if value is None:
@@ -199,20 +266,42 @@ def _read_nodes(input_dir: Path, table: dict, audit: dict) -> list[dict]:
                 _fail(audit, f"{where}, field {field} ({columns[field]}): expected boolean or null, received {value!r}")
             else:
                 quality[field] = value
-        if quality["outbound_censored"] is True:
+        if traversal is not None:
+            depth, seed = quality["hop_depth"], quality["is_seed"]
+            if depth is None or seed is None:
+                _fail(audit, f"{where}: reviewed outgoing BFS requires non-null is_seed and hop_depth")
+            if depth > traversal["max_depth"]:
+                _fail(audit, f"{where}, field hop_depth: {depth} exceeds traversal.max_depth={traversal['max_depth']}")
+            if seed != (depth == 0):
+                _fail(audit, f"{where}: is_seed must be true exactly when hop_depth is 0")
+            derived = {"outbound_censored": depth >= traversal["max_depth"], "inbound_incomplete": True if seed else None}
+            for field, value in derived.items():
+                if quality[field] is not None and quality[field] != value:
+                    _fail(audit, f"{where}, field {field}: explicit flag conflicts with reviewed outgoing traversal semantics")
+                quality[field] = value
+            quality["reasons"].extend([
+                f"Обход выполнен только по исходящим до глубины {traversal['max_depth']}; обрезка определена по глубине узла",
+                "Входящие переводы seed не собирались отдельно; входящий объём неполон" if seed else "Входящие извне выборки не наблюдались; полнота входящего объёма неизвестна",
+            ])
+        if observation is not None:
+            quality["reasons"].append(f"Период наблюдения: {observation['start_date']} — {observation['end_date']} включительно")
+            if observation["minimum_transaction_minor_units"] is not None:
+                quality["reasons"].append(f"В выборку входят только переводы >= {money_string(observation['minimum_transaction_minor_units'])} KZT")
+        if quality["outbound_censored"] is True and traversal is None:
             quality["reasons"].append("Outgoing observation is explicitly marked as censored")
-        if quality["inbound_incomplete"] is True:
+        if quality["inbound_incomplete"] is True and traversal is None:
             quality["reasons"].append("Incoming observation is explicitly marked as incomplete")
         nodes.append({"gid": gid, "quality": quality})
     return sorted(nodes, key=lambda node: node["gid"])
 
 
-def _read_pairs(input_dir: Path, table: dict, gids: set[str], audit: dict, name: str) -> dict[tuple[str, str], tuple[int, int]]:
+def _read_pairs(input_dir: Path, table: dict, gids: set[str], audit: dict, name: str, float_policy: str = "reject", observation: dict | None = None) -> dict[tuple[str, str], tuple[int, int]]:
     columns = table["columns"]
     pairs: dict[tuple[str, str], tuple[int, int]] = {}
     pair_first_rows: dict[tuple[str, str], int] = {}
     ids: dict[str, int] = {}
-    repeated: Counter[tuple[str, str, int]] = Counter()
+    repeated: Counter[tuple] = Counter()
+    observed_dates: list[date] = []
     rows = _read_rows(input_dir, table, audit)
     for row_number, row in enumerate(rows, 1):
         where = f"{table['file']}: row {row_number}"
@@ -221,7 +310,14 @@ def _read_pairs(input_dir: Path, table: dict, gids: set[str], audit: dict, name:
         for field, gid in (("source", source), ("target", target)):
             if gid not in gids:
                 _fail(audit, f"{where}, field {field} ({columns[field]}): unknown node gid {gid!r}")
-        amount = _amount(row[columns["amount"]], f"{where}, field amount ({columns['amount']})", audit)
+        amount = _amount(row[columns["amount"]], f"{where}, field amount ({columns['amount']})", audit, float_policy)
+        event_date = _event_date(row, table, observation, where, audit)
+        if event_date is not None:
+            observed_dates.append(event_date)
+        if table["kind"] == "event" and observation is not None:
+            minimum = observation["minimum_transaction_minor_units"]
+            if minimum is not None and amount < minimum:
+                _fail(audit, f"{where}, field amount ({columns['amount']}): amount is below the declared minimum transaction filter {money_string(minimum)} KZT")
         tx_count = _count(row[columns["tx_count"]], f"{where}, field tx_count ({columns['tx_count']})", audit) if table["kind"] == "aggregate" else 1
         if tx_count == 0 and amount > 0:
             _fail(audit, f"{where}, field tx_count ({columns['tx_count']}): zero transactions cannot have a positive amount")
@@ -234,7 +330,7 @@ def _read_pairs(input_dir: Path, table: dict, gids: set[str], audit: dict, name:
                 _fail(audit, f"{where}, field id ({columns['id']}): duplicate ID {event_id!r}; first seen at row {ids[event_id]}; no rows were silently removed")
             ids[event_id] = row_number
         elif table["kind"] == "event":
-            repeated[(source, target, amount)] += 1
+            repeated[(source, target, amount, event_date)] += 1
         pair = (source, target)
         if table["kind"] == "aggregate" and pair in pairs:
             _fail(audit, f"{where}: duplicate aggregate directed pair {pair!r}; first seen at row {pair_first_rows[pair]}; declare kind='event' only after source semantics are confirmed")
@@ -248,10 +344,40 @@ def _read_pairs(input_dir: Path, table: dict, gids: set[str], audit: dict, name:
         "duplicate_id_count": 0,
         "repeated_canonical_events_without_id": sum(count - 1 for count in repeated.values()),
         "repeated_event_policy": "retain every event; no automatic deduplication",
-        "repeated_event_definition": "same mapped source, target and exact amount; other unmapped columns are not compared",
+        "repeated_event_definition": "same mapped source, target, exact amount and date (if mapped); other unmapped columns are not compared",
         "rows_removed": 0,
     }
+    if "date" in columns:
+        audit["tables"][name]["dates"] = {
+            "semantics": "calendar_date", "validated_rows": len(observed_dates),
+            "first_date": min(observed_dates).isoformat() if observed_dates else None,
+            "last_date": max(observed_dates).isoformat() if observed_dates else None,
+        }
     return pairs
+
+
+def _validate_traversal_pairs(nodes: list[dict], pairs: dict, traversal: dict | None, audit: dict, name: str) -> None:
+    if traversal is None:
+        return
+    depths = {node["gid"]: node["quality"]["hop_depth"] for node in nodes}
+    outgoing: dict[str, list[str]] = {}
+    for source, target in sorted(pairs):
+        if depths[source] >= traversal["max_depth"]:
+            _fail(audit, f"{name}: outgoing pair from boundary node {source!r} contradicts traversal.max_depth")
+        if depths[target] > depths[source] + 1:
+            _fail(audit, f"{name}: pair {source!r} -> {target!r} contradicts minimum BFS hop_depth")
+        outgoing.setdefault(source, []).append(target)
+    distances = {node["gid"]: 0 for node in nodes if node["quality"]["is_seed"]}
+    queue = deque(sorted(distances))
+    while queue:
+        source = queue.popleft()
+        for target in outgoing.get(source, []):
+            if target not in distances:
+                distances[target] = distances[source] + 1
+                queue.append(target)
+    for gid, depth in depths.items():
+        if distances.get(gid) != depth:
+            _fail(audit, f"{name}: node {gid!r} hop_depth={depth} is inconsistent with observed outgoing BFS distance {distances.get(gid)!r}")
 
 
 def load_inputs(input_dir: Path, mapping: dict, self_transfers: str) -> tuple[list[dict], list[dict], dict]:
@@ -275,18 +401,40 @@ def load_inputs(input_dir: Path, mapping: dict, self_transfers: str) -> tuple[li
         _fail(audit, str(exc))
     audit["schemas"] = schemas
     tables = _mapping_tables(mapping, schemas, audit)
+    observation = _observation(mapping, tables, audit)
+    traversal = _traversal(mapping, tables, audit)
+    float_policy = mapping["money"].get("float_policy", "reject")
     audit["dataset_kind"] = mapping["dataset_kind"]
-    audit["money"] = {"unit": "KZT", "scale": 2, "calculation": "integer minor units", "float_policy": "reject"}
+    audit["money"] = {"unit": "KZT", "scale": 2, "calculation": "integer minor units", "float_policy": float_policy}
+    if float_policy == "decimal_string":
+        audit["money"]["conversion"] = "Decimal(str(value)); no rounding; finite values with <=2 effective fractional digits and float ULP <=0.01 KZT"
+        audit["warnings"].append("Approved float conversion describes supplied decimal strings; monetary precision before source float encoding cannot be recovered")
     audit["amount_source"] = mapping["amount_source"]
     audit["quality_sources"] = {
         field: {"file": tables["nodes"]["file"], "column": tables["nodes"]["columns"].get(field), "inferred": False}
         for field in ("is_seed", "hop_depth", "outbound_censored", "inbound_incomplete")
     }
-    nodes = _read_nodes(input_dir, tables["nodes"], audit)
+    if traversal is not None:
+        audit["traversal"] = dict(traversal)
+        for field in ("outbound_censored", "inbound_incomplete"):
+            audit["quality_sources"][field] = {
+                "file": tables["nodes"]["file"], "column": None, "inferred": True,
+                "basis": "approved outgoing BFS metadata and mapped hop_depth/is_seed",
+                "provenance": traversal["source"],
+            }
+    if observation is not None:
+        audit["observation"] = {
+            "start_date": observation["start_date"].isoformat(), "end_date": observation["end_date"].isoformat(),
+            "date_semantics": "calendar_date", "period_bounds": "inclusive",
+            "minimum_transaction_kzt": None if observation["minimum_transaction_minor_units"] is None else money_string(observation["minimum_transaction_minor_units"]),
+        }
+    nodes = _read_nodes(input_dir, tables["nodes"], audit, traversal, observation)
     audit["tables"]["nodes"] = {"file": tables["nodes"]["file"], "row_count": len(nodes), "duplicate_gid_count": 0}
     gids = {node["gid"] for node in nodes}
-    edge_pairs = _read_pairs(input_dir, tables["edges"], gids, audit, "edges")
-    transaction_pairs = _read_pairs(input_dir, tables["transactions"], gids, audit, "transactions")
+    edge_pairs = _read_pairs(input_dir, tables["edges"], gids, audit, "edges", float_policy, observation)
+    transaction_pairs = _read_pairs(input_dir, tables["transactions"], gids, audit, "transactions", float_policy, observation)
+    _validate_traversal_pairs(nodes, edge_pairs, traversal, audit, "edges")
+    _validate_traversal_pairs(nodes, transaction_pairs, traversal, audit, "transactions")
     audit["reconciliation"] = reconcile_pairs(edge_pairs, transaction_pairs)
     audit["reconciliation"]["policy"] = mapping["reconciliation"]
     selected = edge_pairs if mapping["amount_source"] == "edges" else transaction_pairs
@@ -307,11 +455,13 @@ def load_inputs(input_dir: Path, mapping: dict, self_transfers: str) -> tuple[li
         "transaction_rows": audit["tables"]["transactions"]["row_count"],
     }
     audit["quality"] = quality_summary(nodes)
+    if traversal is not None:
+        audit["quality"]["inference"] = "outbound_censored and seed inbound_incomplete follow reviewed outgoing BFS metadata; nonseed inbound completeness is unknown"
     audit["brief_comparison"] = {
         key: {"expected": expected, "actual": audit["counts"][key], "matches": audit["counts"][key] == expected}
         for key, expected in {"nodes": 2248, "edge_rows": 3119, "transaction_rows": 4840, "weak_components": 16}.items()
     }
-    # These are observed counts, never a reconstruction of traversal flags.
+    # These counts use explicit columns or the reviewed traversal declaration.
     seed_known = audit["quality"]["is_seed"]["unknown"] == 0
     censored_known = audit["quality"]["outbound_censored"]["unknown"] == 0
     observed_senders = {source for source, _ in selected}
@@ -335,7 +485,8 @@ def load_inputs(input_dir: Path, mapping: dict, self_transfers: str) -> tuple[li
             audit["counts"][key] = actual
     for field in ("is_seed", "outbound_censored", "inbound_incomplete"):
         if audit["quality"][field]["unknown"]:
-            audit["warnings"].append(f"{field} is unknown for {audit['quality'][field]['unknown']} nodes; no traversal inference was applied")
+            limitation = "outgoing traversal does not establish incoming completeness" if traversal is not None and field == "inbound_incomplete" else "no traversal inference was applied"
+            audit["warnings"].append(f"{field} is unknown for {audit['quality'][field]['unknown']} nodes; {limitation}")
     if audit["quality"]["hop_depth"]["unknown"]:
         audit["warnings"].append("Some hop_depth values are unknown; no depth reconstruction was applied")
     if mapping["dataset_kind"] == "real" and any(check["matches"] is False for check in audit["brief_comparison"].values()):

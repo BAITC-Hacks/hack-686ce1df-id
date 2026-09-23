@@ -1,9 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
+import { demoApi } from '../api/demo';
+import { disabledDemo, type DemoInfo } from '../types/demo';
 import type { ClusterRecord, DataSource, GraphResponse, NodeRecord } from '../types/api';
 
 export type Scope = { kind: 'node' | 'cluster' | 'component'; id: string };
-type Dataset = { runId: string; dataSource: DataSource | null; priorities: NodeRecord[]; clusters: ClusterRecord[]; total: number };
+type Dataset = { runId: string; dataSource: DataSource | null; priorities: NodeRecord[]; clusters: ClusterRecord[]; total: number; demo: DemoInfo };
 type Selection = {
   scope: Scope | null;
   node: NodeRecord | null;
@@ -33,7 +35,7 @@ export function useWorkspace() {
   const bootGeneration = useRef(0);
   const run = useRef<string | null>(null);
 
-  const refresh = useCallback(async (message: string | null = null) => {
+  const refresh = useCallback(async (message: string | null = null): Promise<string | null> => {
     bootRequest.current?.abort();
     selectionRequest.current?.abort();
     generation.current++;
@@ -51,16 +53,24 @@ export function useWorkspace() {
       if (!health.data_ready || !health.run_id) {
         throw new Error('Сервер доступен, но завершённый расчёт ещё не загружен. Повторите запрос после подготовки данных.');
       }
-      const [priorities, clusters] = await Promise.all([api.priorities(controller.signal), api.clusters(controller.signal)]);
-      if (controller.signal.aborted || ticket !== bootGeneration.current) return;
-      if (priorities.run_id !== health.run_id || clusters.run_id !== health.run_id) {
+      const [priorities, clusters, demo] = await Promise.all([
+        api.priorities(controller.signal), api.clusters(controller.signal),
+        demoApi.info(controller.signal).catch(cause => {
+          if (cause instanceof ApiError && cause.status === 404) return disabledDemo(health.run_id);
+          throw cause;
+        }),
+      ]);
+      if (controller.signal.aborted || ticket !== bootGeneration.current) return null;
+      if (priorities.run_id !== health.run_id || clusters.run_id !== health.run_id || demo.run_id !== health.run_id) {
         throw new Error('Во время загрузки изменился расчёт. Обновите набор данных.');
       }
       run.current = health.run_id;
-      setDataset({ runId: health.run_id, dataSource: health.dataSource, priorities: priorities.items, clusters: clusters.items, total: priorities.total });
+      setDataset({ runId: health.run_id, dataSource: health.dataSource, priorities: priorities.items, clusters: clusters.items, total: priorities.total, demo });
+      return health.run_id;
     } catch (cause) {
-      if (controller.signal.aborted || ticket !== bootGeneration.current) return;
+      if (controller.signal.aborted || ticket !== bootGeneration.current) return null;
       setError(cause instanceof Error ? cause.message : errorMessage(cause));
+      return null;
     } finally {
       if (!controller.signal.aborted && ticket === bootGeneration.current) setLoading(false);
     }
@@ -72,7 +82,7 @@ export function useWorkspace() {
 
   const select = useCallback(async (scope: Scope, nextRadius: 1 | 2 = radius) => {
     const expectedRun = run.current;
-    if (!expectedRun) return;
+    if (!expectedRun) return false;
     selectionRequest.current?.abort();
     const controller = new AbortController();
     selectionRequest.current = controller;
@@ -88,10 +98,10 @@ export function useWorkspace() {
           : scope.kind === 'cluster' ? api.cluster(scope.id, controller.signal) : Promise.resolve(null),
         api.graph(query, controller.signal),
       ]);
-      if (!current()) return;
+      if (!current()) return false;
       if (graph.run_id !== expectedRun || (detail && detail.run_id !== expectedRun)) {
         onRunConflict();
-        return;
+        return false;
       }
       const node = detail && 'node' in detail ? detail.node : null;
       const cluster = detail && 'cluster' in detail ? detail.cluster : null;
@@ -99,18 +109,26 @@ export function useWorkspace() {
         throw new Error('Ответ сервера относится к другому объекту. Повторите запрос.');
       }
       setSelection({ scope, node, cluster, graph, loading: false, error: null });
+      return true;
     } catch (cause) {
-      if (!current()) return;
+      if (!current()) return false;
       if (cause instanceof ApiError && (cause.status === 409 || (cause.runId && cause.runId !== expectedRun))) {
         onRunConflict();
-        return;
+        return false;
       }
       const message = cause instanceof ApiError && cause.status === 404
         ? `${scope.kind === 'node' ? 'Узел' : 'Объект'} «${scope.id}» не найден. Проверьте идентификатор.`
         : cause instanceof Error ? cause.message : errorMessage(cause);
       setSelection({ ...emptySelection, scope, error: message });
+      return false;
     }
   }, [radius, onRunConflict]);
+
+  const refreshAndSelect = useCallback(async (gid: string): Promise<boolean> => {
+    const loadedRun = await refresh();
+    if (!loadedRun || run.current !== loadedRun) return false;
+    return select({ kind: 'node', id: gid });
+  }, [refresh, select]);
 
   const changeRadius = (value: 1 | 2) => {
     setRadius(value);
@@ -127,5 +145,5 @@ export function useWorkspace() {
     };
   }, [refresh]);
 
-  return { dataset, selection, radius, loading, error, notice, select, changeRadius, refresh, onRunConflict };
+  return { dataset, selection, radius, loading, error, notice, select, changeRadius, refresh, refreshAndSelect, onRunConflict };
 }

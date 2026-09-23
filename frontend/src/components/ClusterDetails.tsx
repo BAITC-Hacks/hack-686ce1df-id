@@ -1,13 +1,15 @@
+import { EMPTY_NAMES, nodeLabel } from '../names';
 import { ArrowUpRight, GitBranch, ShieldAlert, Users } from 'lucide-react';
 import type { ClusterRecord } from '../types/api';
 
 type ClusterDetailsProps = {
   cluster: ClusterRecord;
+  names?: ReadonlyMap<string, string>;
   onSelectNode: (gid: string) => void;
   onSelectComponent: (id: string) => void;
 };
 
-export function ClusterDetails({ cluster, onSelectNode, onSelectComponent }: ClusterDetailsProps) {
+export function ClusterDetails({ cluster, names = EMPTY_NAMES, onSelectNode, onSelectComponent }: ClusterDetailsProps) {
   return (
     <article className="cluster-details">
       <header className="detail-header">
@@ -32,7 +34,7 @@ export function ClusterDetails({ cluster, onSelectNode, onSelectComponent }: Clu
 
       <section className="detail-section">
         <h3>Узлы кластера <span className="section-count">{cluster.gids.length.toLocaleString('ru-RU')}</span></h3>
-        {cluster.gids.length > 0 ? <div className="cluster-members">{cluster.gids.map(gid => <button type="button" className="member-button" key={gid} onClick={() => onSelectNode(gid)}>{gid}<ArrowUpRight size={12} aria-hidden="true" /></button>)}</div> : <p className="empty-note">В кластере нет узлов.</p>}
+        {cluster.gids.length > 0 ? <div className="cluster-members">{cluster.gids.map(gid => <button type="button" className="member-button" key={gid} onClick={() => onSelectNode(gid)} title={nodeLabel(gid, names)}><span>{names.get(gid) ?? gid}{names.has(gid) ? <small className="node-gid">ID: {gid}</small> : null}</span><ArrowUpRight size={12} aria-hidden="true" /></button>)}</div> : <p className="empty-note">В кластере нет узлов.</p>}
       </section>
     </article>
   );

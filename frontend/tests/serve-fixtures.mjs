@@ -243,6 +243,7 @@ const server = createServer(async (request, response) => {
     const url = new URL(request.url, 'http://127.0.0.1:8010');
     const path = decodeURIComponent(url.pathname);
     if (request.method === 'GET') {
+      if (path === '/api/demo') return json(response, 200, envelope({ enabled: false, node_count: nodes.length, transfer_count: null, nodes: [], groups: [], limits: { date_from: '2026-07-01', date_to: '2026-07-31', min_amount_kzt: '5000.00', max_amount_kzt: '1000000000000.00' } }));
       if (path === '/api/health') return json(response, 200, envelope({ status: 'ok', data_ready: true }));
       if (path.startsWith('/api/nodes/')) return json(response, 200, envelope({ node: required(nodeById, path.slice(11), 'Узел') }));
       if (path === '/api/priorities') {

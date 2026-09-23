@@ -2,13 +2,25 @@ import { useEffect, useRef, useState } from 'react';
 import { Download, ChevronDown, LoaderCircle } from 'lucide-react';
 import { api } from '../api/client';
 
-const files = [
+type ExportFile = readonly [name: string, label: string, extension: 'JSON' | 'CSV', filename?: string];
+
+const files: readonly ExportFile[] = [
   ['nodes', 'Узлы', 'JSON'], ['edges', 'Связи', 'JSON'], ['clusters', 'Кластеры', 'JSON'],
   ['priorities', 'Приоритеты', 'CSV'], ['roles', 'Роли', 'CSV'], ['rules', 'Правила', 'JSON'],
   ['audit', 'Аудит данных', 'JSON'], ['manifest', 'Паспорт расчёта', 'JSON'],
 ] as const;
 
-export function ExportMenu({ runId, onRunConflict }: { runId: string | null; onRunConflict: () => void }) {
+const submissionFiles: readonly ExportFile[] = [
+  ['nodes_roles', 'Роли узлов · CSV задания', 'CSV'],
+  ['clusters_csv', 'Кластеры · CSV задания', 'CSV', 'clusters.csv'],
+  ['top_nodes', 'Приоритетные узлы · CSV задания', 'CSV'],
+];
+
+const demoFiles: readonly ExportFile[] = [
+  ['node_names', 'Имена узлов', 'JSON'], ['source', 'Исходные демоданные', 'JSON'], ['transfers', 'Отдельные переводы', 'JSON'],
+];
+
+export function ExportMenu({ runId, onRunConflict, demo = false, realRun = false }: { runId: string | null; onRunConflict: () => void; demo?: boolean; realRun?: boolean }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -22,7 +34,7 @@ export function ExportMenu({ runId, onRunConflict }: { runId: string | null; onR
       controller.current = null;
     };
   }, [runId]);
-  const download = async (name: string, extension: string) => {
+  const download = async (name: string, filename: string) => {
     if (!runId) return;
     const request = new AbortController();
     controller.current?.abort();
@@ -42,7 +54,7 @@ export function ExportMenu({ runId, onRunConflict }: { runId: string | null; onR
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${name}.${extension.toLowerCase()}`;
+      link.download = filename;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -58,7 +70,7 @@ export function ExportMenu({ runId, onRunConflict }: { runId: string | null; onR
     <button className="button button-secondary" disabled={!runId} aria-expanded={open} aria-controls="export-files" onClick={() => setOpen(!open)}><Download size={16} />Выгрузки<ChevronDown size={14} /></button>
     {open ? <div className="export-popover" id="export-files">
       <p className="popover-title">Файлы текущего расчёта</p>
-      {files.map(([name, label, extension]) => <button key={name} aria-label={`Скачать ${name}.${extension.toLowerCase()}`} onClick={() => void download(name, extension)} disabled={busy !== null}>{busy === name ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}<span>{label}</span><small>{extension}</small></button>)}
+      {[...files, ...(realRun && !demo ? submissionFiles : []), ...(demo ? demoFiles : [])].map(([name, label, extension, filename = `${name}.${extension.toLowerCase()}`]) => <button key={name} aria-label={`Скачать ${filename}`} onClick={() => void download(name, filename)} disabled={busy !== null}>{busy === name ? <LoaderCircle className="spin" size={15} /> : <Download size={15} />}<span>{label}</span><small>{extension}</small></button>)}
       {error ? <p className="error-text" role="alert">{error}</p> : null}
     </div> : null}
   </div>;

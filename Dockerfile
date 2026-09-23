@@ -16,12 +16,13 @@ WORKDIR /app
 COPY requirements.lock ./
 RUN pip install --no-cache-dir -r requirements.lock && pip check
 COPY backend/ ./backend/
+COPY config/ ./config/
 
 FROM backend-base AS backend-test
 COPY pyproject.toml ./
 COPY contracts/ ./contracts/
 COPY tests/ ./tests/
-RUN python -m pytest tests/api tests/ai -q -p no:cacheprovider \
+RUN python -m pytest -q -p no:cacheprovider \
     && python -m backend.app.openapi --check
 
 FROM backend-base AS runtime

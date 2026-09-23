@@ -15,10 +15,13 @@ class APIError(Exception):
 
 
 def error_response(request: Request, status: int, code: str, message: str) -> JSONResponse:
-    store = getattr(request.app.state, "store", None)
+    snapshot = getattr(request.state, "snapshot", None)
+    run_id = getattr(request.state, "response_run_id", None)
+    if run_id is None and snapshot is not None:
+        run_id = snapshot.store.run_id
     body = ErrorResponse(
         error=ErrorDetail(code=code, message=message),
-        run_id=store.run_id if store is not None else None,
+        run_id=run_id,
     )
     return JSONResponse(status_code=status, content=body.model_dump())
 

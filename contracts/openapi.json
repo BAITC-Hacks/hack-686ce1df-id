@@ -2,7 +2,7 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Money Graph API",
-    "description": "One completed run. Synthetic data requires explicit fixture mode; see X-Data-Source.",
+    "description": "Versioned graph snapshots. Synthetic data requires explicit fixture or demo mode; see X-Data-Source.",
     "version": "1.0"
   },
   "paths": {
@@ -24,6 +24,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -35,7 +45,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -96,6 +106,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -107,7 +127,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -181,6 +201,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -192,7 +222,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -242,6 +272,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -253,7 +293,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -314,6 +354,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -325,7 +375,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -452,6 +502,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -463,7 +523,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -517,6 +577,16 @@
           "200": {
             "description": "Immutable file from the current manifest.files allowlist."
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -528,7 +598,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -588,6 +658,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -599,7 +679,7 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -659,6 +739,16 @@
               }
             }
           },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
           "404": {
             "description": "Identifier or export not found",
             "content": {
@@ -670,7 +760,240 @@
             }
           },
           "409": {
-            "description": "Stale AI run_id",
+            "description": "Stale run_id or conflicting demo request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No completed run available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo": {
+      "get": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Demo Info",
+        "operationId": "demo_info_api_demo_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DemoInfoResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifier or export not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale run_id or conflicting demo request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No completed run available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/nodes": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Add Node",
+        "operationId": "add_node_api_demo_nodes_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddNodeRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifier or export not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale run_id or conflicting demo request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No completed run available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/demo/transfers": {
+      "post": {
+        "tags": [
+          "demo"
+        ],
+        "summary": "Add Transfer",
+        "operationId": "add_transfer_api_demo_transfers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddTransferRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MutationResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifier or export not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale run_id or conflicting demo request",
             "content": {
               "application/json": {
                 "schema": {
@@ -834,6 +1157,121 @@
         ],
         "title": "AIResponse"
       },
+      "AddNodeRequest": {
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          },
+          "gid": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 64,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_-]+$"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gid"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "oneOf": [
+                  {
+                    "$ref": "#/components/schemas/ExistingGroup"
+                  },
+                  {
+                    "$ref": "#/components/schemas/NewGroup"
+                  }
+                ],
+                "discriminator": {
+                  "propertyName": "kind",
+                  "mapping": {
+                    "existing": "#/components/schemas/ExistingGroup",
+                    "new": "#/components/schemas/NewGroup"
+                  }
+                }
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Group"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/InputQuality"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "run_id",
+          "request_id",
+          "display_name"
+        ],
+        "title": "AddNodeRequest"
+      },
+      "AddTransferRequest": {
+        "properties": {
+          "source": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Source"
+          },
+          "target": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Target"
+          },
+          "amount_kzt": {
+            "type": "string",
+            "title": "Amount Kzt"
+          },
+          "date": {
+            "type": "string",
+            "title": "Date"
+          },
+          "run_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "request_id": {
+            "type": "string",
+            "title": "Request Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "source",
+          "target",
+          "amount_kzt",
+          "date",
+          "run_id",
+          "request_id"
+        ],
+        "title": "AddTransferRequest"
+      },
       "ClusterHypothesis": {
         "properties": {
           "text": {
@@ -953,6 +1391,120 @@
           "items"
         ],
         "title": "ClustersResponse"
+      },
+      "DemoInfoResponse": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "const": "1.0",
+            "title": "Contract Version",
+            "default": "1.0"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 128,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "enabled": {
+            "type": "boolean",
+            "title": "Enabled"
+          },
+          "node_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Node Count",
+            "default": 0
+          },
+          "transfer_count": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Transfer Count"
+          },
+          "nodes": {
+            "items": {
+              "$ref": "#/components/schemas/NodeName"
+            },
+            "type": "array",
+            "title": "Nodes",
+            "default": []
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SourceGroup"
+            },
+            "type": "array",
+            "title": "Groups",
+            "default": []
+          },
+          "limits": {
+            "$ref": "#/components/schemas/DemoLimits"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "contract_version",
+          "run_id",
+          "enabled",
+          "node_count",
+          "transfer_count",
+          "nodes",
+          "groups",
+          "limits"
+        ],
+        "title": "DemoInfoResponse"
+      },
+      "DemoLimits": {
+        "properties": {
+          "date_from": {
+            "type": "string",
+            "const": "2026-07-01",
+            "title": "Date From",
+            "default": "2026-07-01"
+          },
+          "date_to": {
+            "type": "string",
+            "const": "2026-07-31",
+            "title": "Date To",
+            "default": "2026-07-31"
+          },
+          "min_amount_kzt": {
+            "type": "string",
+            "const": "5000.00",
+            "title": "Min Amount Kzt",
+            "default": "5000.00"
+          },
+          "max_amount_kzt": {
+            "type": "string",
+            "const": "1000000000000.00",
+            "title": "Max Amount Kzt",
+            "default": "1000000000000.00"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "date_from",
+          "date_to",
+          "min_amount_kzt",
+          "max_amount_kzt"
+        ],
+        "title": "DemoLimits"
       },
       "EdgeRecord": {
         "properties": {
@@ -1110,6 +1662,28 @@
         ],
         "title": "Evidence"
       },
+      "ExistingGroup": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "existing",
+            "title": "Kind"
+          },
+          "id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "id"
+        ],
+        "title": "ExistingGroup"
+      },
       "ExplainRequest": {
         "properties": {
           "run_id": {
@@ -1226,6 +1800,58 @@
         ],
         "title": "HealthResponse"
       },
+      "InputQuality": {
+        "properties": {
+          "is_seed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Is Seed"
+          },
+          "hop_depth": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hop Depth"
+          },
+          "outbound_censored": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outbound Censored"
+          },
+          "inbound_incomplete": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inbound Incomplete"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "InputQuality"
+      },
       "InvestigateRequest": {
         "properties": {
           "run_id": {
@@ -1253,6 +1879,76 @@
         "title": "InvestigateRequest"
       },
       "JsonValue": {},
+      "MutationResponse": {
+        "properties": {
+          "contract_version": {
+            "type": "string",
+            "const": "1.0",
+            "title": "Contract Version",
+            "default": "1.0"
+          },
+          "run_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Run Id"
+          },
+          "created_id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Created Id"
+          },
+          "select_gid": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Select Gid"
+          },
+          "node_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Node Count"
+          },
+          "transfer_count": {
+            "type": "integer",
+            "minimum": 0.0,
+            "title": "Transfer Count"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "contract_version",
+          "run_id",
+          "created_id",
+          "select_gid",
+          "node_count",
+          "transfer_count"
+        ],
+        "title": "MutationResponse"
+      },
+      "NewGroup": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "new",
+            "title": "Kind"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "kind",
+          "name"
+        ],
+        "title": "NewGroup"
+      },
       "NodeMetrics": {
         "properties": {
           "in_degree_unique": {
@@ -1309,6 +2005,28 @@
           "out_in_ratio"
         ],
         "title": "NodeMetrics"
+      },
+      "NodeName": {
+        "properties": {
+          "gid": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 1,
+            "pattern": "^[A-Za-z0-9_-]+$",
+            "title": "Gid"
+          },
+          "display_name": {
+            "type": "string",
+            "title": "Display Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "gid",
+          "display_name"
+        ],
+        "title": "NodeName"
       },
       "NodeQuality": {
         "properties": {
@@ -1534,6 +2252,27 @@
           "total"
         ],
         "title": "PrioritiesResponse"
+      },
+      "SourceGroup": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 1,
+            "title": "Id"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "id",
+          "name"
+        ],
+        "title": "SourceGroup"
       },
       "Target": {
         "properties": {

@@ -3,6 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { api } from '../src/api/client';
+import { disabledDemo } from '../src/types/demo';
 import type { DataSource, HealthResponse } from '../src/types/api';
 
 // Graph rendering is independent of the origin banner and requires a real canvas.
@@ -21,6 +22,7 @@ function serveApi(initialSource: DataSource | null) {
     if (path === '/api/health' && source !== null) headers.set('X-Data-Source', source);
     const data = path === '/api/health' ? health
       : path === '/api/priorities' ? { contract_version: '1.0', run_id: runId, items: [], total: 0 }
+        : path === '/api/demo' ? disabledDemo(runId)
         : path === '/api/clusters' ? { contract_version: '1.0', run_id: runId, items: [] }
           : null;
     if (data === null) throw new Error(`Unexpected request: ${input}`);
