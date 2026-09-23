@@ -99,20 +99,33 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
         self.assertTrue(any(item.get("type") == "function_call_output" for item in provider.inputs[1]["input"]))
 
     async def test_timeout_is_whole_request_and_preserves_checks(self):
+        second_call_cancelled = asyncio.Event()
+
         async def delay():
-            await asyncio.sleep(0.04)
+            await asyncio.sleep(0.1)
             return ProviderReply(calls=[ToolCall("c1", "get_node", {"gid": "0007"})])
 
         async def hang():
-            await asyncio.sleep(10)
+            try:
+                await asyncio.Event().wait()
+            except asyncio.CancelledError:
+                second_call_cancelled.set()
+                raise
 
         provider = FakeProvider(delay, hang)
-        started = time.monotonic()
-        result = await service(provider, timeout_seconds=0.08).investigate(request(question="Проверь"), FakeStore())
-        self.assertLess(time.monotonic() - started, 0.3)
+        # Leave room for Windows timer resolution and worker startup so the
+        # request deadline expires during the second call, after the check.
+        # The outer guard fails the test if the service stops enforcing it.
+        result = await asyncio.wait_for(
+            service(provider, timeout_seconds=0.5).investigate(request(question="Проверь"), FakeStore()),
+            timeout=2,
+        )
         self.assertEqual(result["status"], "fallback")
         self.assertEqual(result["fallback_reason"], "timeout")
         self.assertEqual(len(result["checks"]), 1)
+        self.assertEqual(result["checks"][0]["tool"], "get_node")
+        self.assertTrue(second_call_cancelled.is_set())
+        self.assertEqual(len(provider.inputs), 2)
         self.assertLess(provider.inputs[1]["timeout"], provider.inputs[0]["timeout"])
 
     async def test_error_after_check_keeps_trace(self):

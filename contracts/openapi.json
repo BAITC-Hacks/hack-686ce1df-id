@@ -81,6 +81,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "minLength": 1,
               "title": "Gid"
             }
           }
@@ -373,6 +374,7 @@
             "required": true,
             "schema": {
               "type": "string",
+              "minLength": 1,
               "title": "Cluster Id"
             }
           }
