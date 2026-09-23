@@ -28,5 +28,5 @@ money-graph = "backend.__main__:main"
 include = ["backend*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/api", "tests/ai", "tests/analytics", "tests/demo"]
+testpaths = ["tests/api", "tests/ai", "tests/analytics", "tests/demo", "tests/packaging"]
 addopts = "-ra"

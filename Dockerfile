@@ -23,6 +23,7 @@ FROM backend-base AS backend-test
 COPY pyproject.toml ./
 COPY contracts/ ./contracts/
 COPY tests/ ./tests/
+COPY scripts/ ./scripts/
 RUN python -m pytest -q -p no:cacheprovider \
     && python -m backend.app.openapi --check
 
