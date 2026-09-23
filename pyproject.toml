@@ -13,6 +13,9 @@ dependencies = [
   "pydantic==2.13.5",
   "python-dotenv==1.1.1",
   "uvicorn==0.35.0",
+  "pyarrow==19.0.1",
+  "networkx==3.4.2",
+  "numpy==2.5.3",
 ]
 
 [project.optional-dependencies]
@@ -25,5 +28,5 @@ money-graph = "backend.__main__:main"
 include = ["backend*"]
 
 [tool.pytest.ini_options]
-testpaths = ["tests/api", "tests/ai"]
+testpaths = ["tests/api", "tests/ai", "tests/analytics", "tests/demo"]
 addopts = "-ra"

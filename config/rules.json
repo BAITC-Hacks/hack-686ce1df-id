@@ -1,5 +1,262 @@
 {
-  "status": "pending_approval",
-  "proposal": "docs/methodology.md",
-  "pending_reason": "Правила ролей, кластеров, приоритета и самопереводов ожидают явного согласования. Производственная классификация не выполнялась."
+  "schema_version": 1,
+  "status": "configured",
+  "rules_version": "observed-graph-v1",
+  "algorithm_version": "observed-graph-v1",
+  "description": "Reproducible engineering hypotheses for the observed graph; not calibrated probabilities, legal findings or an approved risk model.",
+  "self_transfers": "exclude",
+  "random_seed": 42,
+  "roles": {
+    "precedence": [
+      "coordinator",
+      "consolidator",
+      "distributor",
+      "transit",
+      "terminal"
+    ],
+    "matched_score": 100,
+    "fallback_score": 0,
+    "rules": [
+      {
+        "id": "role.coordinator",
+        "role": "coordinator",
+        "conditions": [
+          {
+            "metric": "in_degree_unique",
+            "operator": "gte",
+            "threshold": 3
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "gte",
+            "threshold": 3
+          }
+        ]
+      },
+      {
+        "id": "role.consolidator",
+        "role": "consolidator",
+        "conditions": [
+          {
+            "metric": "is_seed",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "outbound_censored",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "in_degree_unique",
+            "operator": "gte",
+            "threshold": 3
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "gte",
+            "threshold": 1
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "lte",
+            "threshold": 2
+          },
+          {
+            "metric": "in_amount_kzt",
+            "operator": "gt",
+            "threshold": "0"
+          },
+          {
+            "metric": "out_in_ratio",
+            "operator": "gt",
+            "threshold": 0
+          },
+          {
+            "metric": "out_in_ratio",
+            "operator": "lte",
+            "threshold": 0.5
+          }
+        ]
+      },
+      {
+        "id": "role.distributor.observed_balance",
+        "role": "distributor",
+        "conditions": [
+          {
+            "metric": "is_seed",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "outbound_censored",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "in_degree_unique",
+            "operator": "lte",
+            "threshold": 2
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "gte",
+            "threshold": 3
+          },
+          {
+            "metric": "in_amount_kzt",
+            "operator": "gt",
+            "threshold": "0"
+          },
+          {
+            "metric": "out_in_ratio",
+            "operator": "gte",
+            "threshold": 1.5
+          }
+        ]
+      },
+      {
+        "id": "role.distributor.seed_structure",
+        "role": "distributor",
+        "conditions": [
+          {
+            "metric": "is_seed",
+            "operator": "eq",
+            "threshold": true
+          },
+          {
+            "metric": "in_degree_unique",
+            "operator": "lte",
+            "threshold": 2
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "gte",
+            "threshold": 3
+          }
+        ]
+      },
+      {
+        "id": "role.transit",
+        "role": "transit",
+        "conditions": [
+          {
+            "metric": "is_seed",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "outbound_censored",
+            "operator": "eq",
+            "threshold": false
+          },
+          {
+            "metric": "in_degree_unique",
+            "operator": "gte",
+            "threshold": 1
+          },
+          {
+            "metric": "in_degree_unique",
+            "operator": "lte",
+            "threshold": 2
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "gte",
+            "threshold": 1
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "lte",
+            "threshold": 2
+          },
+          {
+            "metric": "in_amount_kzt",
+            "operator": "gt",
+            "threshold": "0"
+          },
+          {
+            "metric": "out_in_ratio",
+            "operator": "gte",
+            "threshold": 0.8
+          },
+          {
+            "metric": "out_in_ratio",
+            "operator": "lte",
+            "threshold": 1.25
+          }
+        ]
+      },
+      {
+        "id": "role.terminal",
+        "role": "terminal",
+        "conditions": [
+          {
+            "metric": "in_degree_unique",
+            "operator": "gte",
+            "threshold": 1
+          },
+          {
+            "metric": "in_amount_kzt",
+            "operator": "gt",
+            "threshold": "0"
+          },
+          {
+            "metric": "out_degree_unique",
+            "operator": "eq",
+            "threshold": 0
+          },
+          {
+            "metric": "out_amount_kzt",
+            "operator": "eq",
+            "threshold": "0"
+          },
+          {
+            "metric": "outbound_censored",
+            "operator": "eq",
+            "threshold": false
+          }
+        ]
+      }
+    ]
+  },
+  "clustering": {
+    "algorithm": "louvain",
+    "projection": "undirected_sum",
+    "weight": "tx_count",
+    "resolution": 1.0,
+    "threshold": 1e-07,
+    "id_hash": "sha256_first16"
+  },
+  "cluster_hypotheses": {
+    "coordinator_min_count": 1,
+    "transit_min_fraction": 0.5,
+    "terminal_min_fraction": 0.5,
+    "rule_ids": {
+      "singleton": "cluster.singleton",
+      "coordinator": "cluster.coordinator",
+      "transit": "cluster.transit",
+      "terminal": "cluster.terminal",
+      "unresolved": "cluster.unresolved"
+    }
+  },
+  "priority": {
+    "formula": "log1p_max_weighted",
+    "weights": {
+      "volume_kzt": 0.45,
+      "degree": 0.3,
+      "transactions": 0.25
+    },
+    "quality": {
+      "base": 0.8,
+      "outgoing_complete_bonus": 0.1,
+      "incoming_complete_bonus": 0.1
+    },
+    "decimals": 4,
+    "rule_ids": {
+      "quality": "priority.quality",
+      "normalization": "priority.normalization",
+      "formula": "priority.formula"
+    }
+  }
 }

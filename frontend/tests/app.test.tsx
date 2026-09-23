@@ -4,6 +4,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import App from '../src/App';
 import { api } from '../src/api/client';
+import { demoApi } from '../src/api/demo';
+import { disabledDemo } from '../src/types/demo';
 import type { AIResponse, GraphResponse, NodeRecord } from '../src/types/api';
 import fixtureNodes from '../../tests/fixtures/contract-v1/nodes.json';
 
@@ -47,6 +49,7 @@ async function readyApp() {
 
 beforeEach(() => {
   vi.stubEnv('VITE_DATA_SOURCE', '');
+  vi.spyOn(demoApi, 'info').mockResolvedValue(disabledDemo(RUN));
   vi.spyOn(api, 'health').mockResolvedValue({ status: 'ok', contract_version: '1.0', run_id: RUN, data_ready: true, dataSource: 'artifacts' });
   vi.spyOn(api, 'priorities').mockResolvedValue({ contract_version: '1.0', run_id: RUN, items: nodes, total: nodes.length });
   vi.spyOn(api, 'clusters').mockResolvedValue({ contract_version: '1.0', run_id: RUN, items: [] });
@@ -118,6 +121,7 @@ describe('AI state while navigating the workspace', () => {
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Объяснить' })); });
     vi.mocked(api.graph).mockResolvedValueOnce(graphResponse('0007', NEXT_RUN));
     vi.mocked(api.health).mockResolvedValue({ status: 'ok', contract_version: '1.0', run_id: NEXT_RUN, data_ready: true, dataSource: 'artifacts' });
+    vi.mocked(demoApi.info).mockResolvedValue(disabledDemo(NEXT_RUN));
     vi.mocked(api.priorities).mockResolvedValue({ contract_version: '1.0', run_id: NEXT_RUN, items: nodes, total: nodes.length });
     vi.mocked(api.clusters).mockResolvedValue({ contract_version: '1.0', run_id: NEXT_RUN, items: [] });
     await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Радиус 2' })); });
@@ -143,6 +147,7 @@ describe('dataset source notice', () => {
 
     vi.stubEnv('VITE_DATA_SOURCE', 'fixture');
     fetch.mockResolvedValue(new Response(JSON.stringify({ status: 'ok', contract_version: '1.0', run_id: NEXT_RUN, data_ready: true }), { headers: { 'X-Data-Source': 'artifacts' } }));
+    vi.mocked(demoApi.info).mockResolvedValue(disabledDemo(NEXT_RUN));
     vi.mocked(api.priorities).mockResolvedValue({ contract_version: '1.0', run_id: NEXT_RUN, items: nodes, total: nodes.length });
     vi.mocked(api.clusters).mockResolvedValue({ contract_version: '1.0', run_id: NEXT_RUN, items: [] });
     fireEvent.click(screen.getByRole('button', { name: 'Обновить набор данных' }));

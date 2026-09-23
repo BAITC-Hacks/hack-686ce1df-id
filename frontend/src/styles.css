@@ -260,3 +260,49 @@
   @media (max-width: 620px) { .app-header { height: 76px; padding: 0 16px; gap: 10px; } .brand { gap: 9px; } .brand h1 { font-size: 18px; } .brand > div > span { font-size: 9px; } .brand-icon { width: 35px; height: 35px; border-radius: 10px; } .header-actions { gap: 4px; } .header-actions > .icon-button { display: none; } .header-actions .button { padding: 8px; font-size: 11px; gap: 5px; } .run-bar { flex-wrap: wrap; height: auto; min-height: 48px; padding: 10px 16px; gap: 7px 14px; } .run-identity { font-size: 10px; max-width: 100%; } .source-label { width: 100%; font-size: 10px; margin: 0; } .workspace { display: flex; flex-direction: column; gap: 0; } .navigation-panel { border-bottom: 1px solid var(--line); } .navigation-content { max-height: 265px; } .navigation-footer { display: none; } .search-panel { padding: 17px; } .graph-panel { height: 610px; border-bottom: 1px solid var(--line); } .graph-stage { min-height: 270px; } .graph-header { padding: 20px 17px; } .graph-legend { padding: 12px; gap: 8px 12px; } .graph-overlay { padding: 20px; } .details-content { display: block; } .details-empty { padding: 40px 30px; } .ai-panel { border-left: 0; border-top: 1px solid var(--line); padding: 20px; } .node-details, .cluster-details { padding: 20px; } .amount-grid { grid-template-columns: 1fr 1fr; } .app-footer { align-items: flex-start; padding: 12px 16px; font-size: 9px; } .app-footer span:first-child { align-items: flex-start; } }
   @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; scroll-behavior: auto !important; } }
 }
+
+@layer components {
+  .node-gid { display: block; color: #63768f; font-size: 11px; font-weight: 400; line-height: 1.5; }
+  .priority-identity { min-width: 0; }
+  .priority-identity > strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .member-button > span { text-align: left; overflow-wrap: anywhere; }
+  .demo-launch-actions { display: flex; gap: 8px; }
+  .demo-launch-actions .button { min-height: 44px; }
+  .search-results { max-height: 260px; overflow-y: auto; margin-top: 9px; border: 1px solid var(--line); border-radius: 6px; }
+  .search-results > button, .picker-results > button { width: 100%; display: flex; flex-direction: column; align-items: flex-start; justify-content: center; gap: 3px; min-height: 48px; padding: 9px 12px; text-align: left; }
+  .search-results > button:hover, .picker-results > button:hover, .picker-results > button[aria-selected="true"] { background: #edf3ff; }
+  .search-results strong, .picker-results span { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+  .search-results small, .picker-results small { font-size: 11px; color: #63768f; }
+  .search-message { font-size: 12px; color: #536985; margin-top: 9px; }
+  .demo-editor-layer[hidden] { display: none; }
+  .demo-editor-layer { position: fixed; inset: 0; z-index: 80; display: flex; justify-content: flex-end; }
+  .demo-editor-backdrop { position: absolute; inset: 0; background: #18324c26; }
+  .demo-editor { position: relative; width: min(460px, 100vw); height: 100%; overflow-y: auto; background: #fff; box-shadow: -8px 0 32px #18324c22; padding: 26px; }
+  .editor-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .editor-heading h2 { font-size: 21px; font-weight: 600; }
+  .editor-heading .icon-button { min-width: 44px; min-height: 44px; }
+  .editor-intro { color: #536985; font-size: 13px; margin: 17px 0 25px; line-height: 1.6; }
+  .demo-form fieldset { border: 0; padding: 0; margin: 0; min-width: 0; }
+  .demo-field { display: flex; flex-direction: column; gap: 7px; margin: 18px 0; min-width: 0; }
+  .demo-field label { font-size: 13px; font-weight: 600; color: #243955; }
+  .demo-field input, .demo-field select { width: 100%; min-height: 44px; border: 1px solid #c5d0df; background: #fff; border-radius: 6px; padding: 11px 12px; font: inherit; font-size: 14px; color: #223751; }
+  .demo-field input:focus, .demo-field select:focus { outline: 3px solid #dce6ff; border-color: #315ed9; }
+  .demo-field input[aria-invalid="true"] { border-color: #b54636; }
+  .demo-field input:disabled, .demo-field select:disabled, .demo-form fieldset:disabled input, .demo-form fieldset:disabled select { background: #f5f7fa; color: #63768f; }
+  .demo-field small, .optional { color: #61738c; font-size: 11px; font-weight: 400; line-height: 1.5; }
+  .field-error { color: #a13526; font-size: 12px; line-height: 1.5; }
+  .editor-extras { border-top: 1px solid var(--line); margin-top: 22px; }
+  .editor-extras > summary { min-height: 48px; padding: 15px 0; cursor: pointer; font-size: 13px; font-weight: 500; }
+  .editor-actions { display: flex; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 24px -26px -26px; padding: 18px 26px; border-top: 1px solid var(--line); background: #fafbfd; }
+  .editor-actions .button { min-height: 44px; }
+  .editor-message { background: #fff7e8; border: 1px solid #eddbb9; border-radius: 6px; padding: 12px; font-size: 13px; color: #74511a; line-height: 1.6; margin-top: 12px; }
+  .node-picker { position: relative; }
+  .picker-results { position: absolute; left: 0; right: 0; top: 73px; max-height: 240px; overflow-y: auto; background: #fff; border: 1px solid #c5d0df; border-radius: 6px; z-index: 5; box-shadow: 0 8px 22px #24395520; }
+  .picker-results p { font-size: 12px; padding: 13px; color: #61738c; }
+  .demo-editor :focus-visible { outline: 3px solid #315ed9; outline-offset: 2px; }
+}
+@layer responsive {
+  @media (max-width: 1150px) { .header-context { display: none; } .header-actions { margin-left: auto; } }
+  @media (max-width: 760px) { .app-header { height: auto; min-height: 76px; flex-wrap: wrap; padding-top: 12px; padding-bottom: 12px; } .demo-launch-actions { flex-wrap: wrap; } .header-actions { flex-wrap: wrap; } }
+  @media (max-width: 620px) { .header-actions { width: 100%; justify-content: flex-start; } .demo-launch-actions { flex: 1; } .header-actions .demo-launch-actions .button { min-height: 44px; font-size: 12px; padding: 9px; } .demo-editor { padding: 20px; } .editor-actions { margin: 24px -20px -20px; padding: 16px 20px; } }
+}

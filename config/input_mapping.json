@@ -1,9 +1,41 @@
 {
-  "status": "pending_real_schema",
+  "status": "approved",
   "dataset_kind": "real",
-  "money": null,
-  "amount_source": null,
+  "money": {
+    "unit": "KZT",
+    "scale": 2,
+    "float_policy": "decimal_string"
+  },
+  "amount_source": "transactions",
   "reconciliation": "error",
-  "tables": {},
-  "pending_reason": "Реальные parquet не предоставлены. Сначала выполните inspect, затем согласуйте и заполните сопоставление полей и семантику данных."
+  "traversal": {
+    "strategy": "outgoing_bfs",
+    "max_depth": 4,
+    "source": "data/source/README.md; verified in docs/data-intake-2026-09-23.md"
+  },
+  "observation": {
+    "start_date": "2026-07-01",
+    "end_date": "2026-07-31",
+    "date_semantics": "calendar_date",
+    "minimum_transaction_kzt": "5000.00"
+  },
+  "tables": {
+    "nodes": {
+      "file": "nodes.parquet",
+      "gid_type": "integer",
+      "columns": {"gid": "gid", "is_seed": "is_seed", "hop_depth": "depth"}
+    },
+    "edges": {
+      "file": "edges.parquet",
+      "gid_type": "integer",
+      "kind": "aggregate",
+      "columns": {"source": "src", "target": "dst", "amount": "sum_kzt", "tx_count": "n_tx"}
+    },
+    "transactions": {
+      "file": "transactions.parquet",
+      "gid_type": "integer",
+      "kind": "event",
+      "columns": {"source": "src", "target": "dst", "amount": "sum_kzt", "date": "date"}
+    }
+  }
 }

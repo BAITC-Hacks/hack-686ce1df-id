@@ -126,7 +126,7 @@ async function requestWithHeaders<T>(path: string, options: RequestOptions = {})
   }
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   return (await requestWithHeaders<T>(path, options)).data;
 }
 
@@ -164,7 +164,7 @@ async function aiRequest(
   if (target.kind !== 'node' && target.kind !== 'cluster') {
     throw new ApiError('Неизвестный тип объекта для AI.', 422, 'INVALID_TARGET');
   }
-  const result = await request<AIResponse>(`/ai/${mode}`, {
+  const result = await requestJson<AIResponse>(`/ai/${mode}`, {
     body: {
       run_id: runId,
       target,
@@ -185,11 +185,11 @@ export const api = {
     const source = headers.get('X-Data-Source');
     return { ...data, dataSource: source === 'fixtures' || source === 'artifacts' || source === 'unavailable' ? source : null };
   },
-  node: (gid: string, signal?: AbortSignal) => request<NodeResponse>(`/node?${new URLSearchParams({ gid: requireId(gid) })}`, { signal }),
-  priorities: (signal?: AbortSignal) => request<PrioritiesResponse>('/priorities?limit=20&offset=0', { signal }),
-  clusters: (signal?: AbortSignal) => request<ClustersResponse>('/clusters', { signal }),
-  cluster: (id: string, signal?: AbortSignal) => request<ClusterResponse>(`/cluster?${new URLSearchParams({ cluster_id: requireId(id) })}`, { signal }),
-  graph: (query: GraphQuery, signal?: AbortSignal) => request<GraphResponse>(`/graph?${graphSearch(query)}`, { signal }),
+  node: (gid: string, signal?: AbortSignal) => requestJson<NodeResponse>(`/node?${new URLSearchParams({ gid: requireId(gid) })}`, { signal }),
+  priorities: (signal?: AbortSignal) => requestJson<PrioritiesResponse>('/priorities?limit=20&offset=0', { signal }),
+  clusters: (signal?: AbortSignal) => requestJson<ClustersResponse>('/clusters', { signal }),
+  cluster: (id: string, signal?: AbortSignal) => requestJson<ClusterResponse>(`/cluster?${new URLSearchParams({ cluster_id: requireId(id) })}`, { signal }),
+  graph: (query: GraphQuery, signal?: AbortSignal) => requestJson<GraphResponse>(`/graph?${graphSearch(query)}`, { signal }),
   explain: (runId: string, target: Target, signal?: AbortSignal) => aiRequest('explain', runId, target, signal),
   investigate: (runId: string, target: Target, question: string, signal?: AbortSignal) => aiRequest('investigate', runId, target, signal, question),
   exportUrl: (name: string) => `${API_BASE}/exports/${encodedId(name)}`,
