@@ -1,0 +1,9 @@
+{
+  "status": "pending_real_schema",
+  "dataset_kind": "real",
+  "money": null,
+  "amount_source": null,
+  "reconciliation": "error",
+  "tables": {},
+  "pending_reason": "Реальные parquet не предоставлены. Сначала выполните inspect, затем согласуйте и заполните сопоставление полей и семантику данных."
+}
