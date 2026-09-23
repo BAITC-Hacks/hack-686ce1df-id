@@ -23,16 +23,19 @@ FROM backend-base AS backend-test
 COPY pyproject.toml ./
 COPY contracts/ ./contracts/
 COPY tests/ ./tests/
+COPY scripts/ ./scripts/
 RUN python -m pytest -q -p no:cacheprovider \
     && python -m backend.app.openapi --check
 
 FROM backend-base AS runtime
 ENV AML_FRONTEND_DIST=/app/frontend/dist
-RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app
+RUN groupadd --gid 10001 app && useradd --uid 10001 --gid app --no-create-home app \
+    && mkdir /app/artifacts && chown app:app /app/artifacts
 COPY --from=frontend-build /build/frontend/dist/ ./frontend/dist/
 COPY tests/fixtures/contract-v1/ ./tests/fixtures/contract-v1/
 COPY docker/healthcheck.py ./docker/healthcheck.py
 COPY scripts/docker_smoke.py ./scripts/docker_smoke.py
+COPY scripts/real_smoke.py scripts/verify_task_exports.py ./scripts/
 USER 10001:10001
 EXPOSE 8000
 HEALTHCHECK --interval=10s --timeout=5s --start-period=10s --retries=3 \

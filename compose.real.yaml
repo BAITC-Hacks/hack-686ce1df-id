@@ -1,0 +1,22 @@
+# Explicit real-data calculation. Use with: -f compose.yaml -f compose.real.yaml
+services:
+  app:
+    command: ["python", "-m", "backend", "--data-dir", "/app/data/raw", "--output-dir", "/app/artifacts", "--host", "0.0.0.0", "--port", "8000"]
+    environment:
+      AML_FIXTURE_MODE: "false"
+      AML_DEMO_MODE: "false"
+      AML_DEMO_DIR: ""
+      AML_RUN_DIR: ""
+    volumes:
+      - type: bind
+        source: ${AML_DATA_DIR:-./data/raw}
+        target: /app/data/raw
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: volume
+        source: real-artifacts
+        target: /app/artifacts
+
+volumes:
+  real-artifacts:

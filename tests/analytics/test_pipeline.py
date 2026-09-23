@@ -63,12 +63,29 @@ def test_complete_pipeline_preserves_all_nodes_and_exports(calculation):
     assert store.get_node("isolated").assignment_status == "insufficient_evidence"
     assert store.get_graph(gid="isolated").shown_nodes == 1
     role_rows = _csv(directory / "nodes_roles.csv")
+    assert list(role_rows[0]) == [
+        "gid", "role", "role_score", "cluster_id", "priority_score", "evidence",
+        "in_deg", "out_deg", "in_kzt", "out_kzt", "pagerank", "pass_through",
+        "depth", "is_seed", "truncated_by_depth", "assignment_status",
+    ]
     assert len(role_rows) == 24
     assert len({row["gid"] for row in role_rows}) == 24
     assert all(all(row.values()) and len(row["evidence"]) <= 200 for row in role_rows)
     assert all(float(row["role_score"]) == store.get_node(row["gid"]).role_score / 100 for row in role_rows)
     assert all(float(row["priority_score"]) == store.get_node(row["gid"]).priority_score / 100 for row in role_rows)
     assert all(any(char.isdigit() for char in row["evidence"]) for row in role_rows)
+    by_gid = {row["gid"]: row for row in role_rows}
+    assert {key: by_gid["0007"][key] for key in
+            ("in_deg", "out_deg", "in_kzt", "out_kzt", "pass_through", "depth", "is_seed", "truncated_by_depth")} == {
+        "in_deg": "0", "out_deg": "22", "in_kzt": "0", "out_kzt": "25300.22",
+        "pass_through": "NA", "depth": "0", "is_seed": "True", "truncated_by_depth": "False",
+    }
+    assert by_gid["7"]["in_kzt"] == "700.01"
+    assert by_gid["7"]["pass_through"] == "0.0"
+    assert by_gid["isolated"]["pass_through"] == "NA"
+    ranks = {gid: float(row["pagerank"]) for gid, row in by_gid.items()}
+    assert sum(ranks.values()) == pytest.approx(1.0)
+    assert ranks["22"] > ranks["1"] > ranks["0007"] == ranks["isolated"] > 0
     top = _csv(directory / "top_nodes.csv")
     assert len(top) == len({row["gid"] for row in top}) == 20
     assert [row["gid"] for row in top] == [node.gid for node in store.list_priorities()]

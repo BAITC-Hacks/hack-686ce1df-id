@@ -1,62 +1,81 @@
-# Docker для проверки «Графа денег»
+# Docker: реальные данные и проверка приложения
 
-## Первый запуск
+## Первый запуск из Parquet
 
-Установить и запустить Docker Desktop с Linux-контейнерами на Windows/macOS либо Docker Engine и Compose v2+ на Linux. Все команды выполнять из `hack-686ce1df-id`, где находятся `Dockerfile` и `compose.yaml`. На Windows подходит PowerShell. Нужен интернет для первой сборки; после неё тестовый интерфейс, API и локальные AI-объяснения работают без сети.
+Установить и запустить Docker Desktop с Linux-контейнерами на Windows/macOS либо Docker Engine и Compose v2+ на Linux. Команды выполнять из корня `hack-686ce1df-id`, где находятся `Dockerfile` и `compose.yaml`; на Windows подходит PowerShell. Интернет нужен для первой сборки. После неё полный расчёт, интерфейс и локальные объяснения работают без сети; внешний AI требует соединения с провайдером.
 
-```sh
-docker compose up --build --wait --wait-timeout 90
-```
-
-Приложение: <http://localhost:8000>. Готовность: <http://localhost:8000/api/health>. Swagger: <http://localhost:8000/docs> (его оформление использует CDN).
-
-`--wait` ждёт готовности контейнера и оставляет его работать в фоне. Лимит 90 секунд относится к запуску, а не скачиванию и сборке. Проверка готовности требует `data_ready=true` и доступный HTML-интерфейс; одного HTTP 200 от health недостаточно.
-
-По умолчанию Compose явно включает фикстуры и отключает внешний AI независимо от локального `.env`. Набор `fixture-contract-v1` содержит только четыре искусственных узла. Проверить `0007` и `7` как разные идентификаторы, `0012` как границу наблюдения, `isolated` как узел без рёбер. В интерфейсе должен быть баннер искусственных данных. Нажатия AI возвращают локальный `fallback`, а не ответ модели.
-
-```sh
-docker compose exec -T app python scripts/docker_smoke.py
-docker compose ps
-docker compose logs --tail=100 app
-docker compose down
-```
-
-Smoke проверяет HTML и JS/CSS, SPA-маршрут, готовность, точные идентификаторы, граф, выгрузку, локальный AI и JSON 404 для неизвестного API. Он предназначен для стандартного режима фикстур; на настоящем наборе использовать проверку готовности и предметные сценарии этого набора.
-
-## Настоящий завершённый набор
-
-Нужен каталог с `manifest.json` со статусом `complete` и всеми перечисленными в нём артефактами. Предварительный отчёт `audit_only` не подходит. Создать полный набор локально: `.venv/bin/python -m backend.app.analytics.cli run --input-dir data/raw --output-dir artifacts`. Команда сообщает готовый `run_dir`; зависимости входят в `requirements.lock`. Образ содержит аналитику и её конфигурацию, но Compose по умолчанию обслуживает готовый набор и не пересчитывает исходные данные при перезапуске.
-
-Создать `.env` (или добавить в существующий) одну строку с путём к готовому каталогу:
+В `data/raw/` должны находиться `nodes.parquet`, `edges.parquet` и `transactions.parquet`. Файлы передаются отдельно от репозитория. Для другого пути создать локальный `.env` по образцу `.env.example` или дополнить существующий, задав `AML_DATA_DIR`:
 
 ```dotenv
-AML_ARTIFACTS_DIR=./artifacts/my-run
+AML_DATA_DIR=./data/raw
 ```
 
-Путь может быть абсолютным; в Windows удобно использовать `C:/datasets/my-run`. Для пути с пробелами заключить значение в двойные кавычки. Каталог должен существовать и быть доступен Docker Desktop; приложение внутри работает с UID/GID `10001:10001`, которому на Linux нужны права чтения файлов и прохода по каталогам.
+Путь может быть абсолютным; в Windows удобно использовать `C:/datasets/money-graph`. Для пути с пробелами заключить значение в двойные кавычки. Каталог должен существовать и быть доступен Docker Desktop. На Linux UID/GID `10001:10001` внутри контейнера нужны права чтения входных файлов и прохода по каталогам.
+
+```sh
+docker compose -f compose.yaml -f compose.real.yaml up --build --wait --wait-timeout 90
+```
+
+Открыть **[http://localhost:8000](http://localhost:8000)**. Если в `.env` задан `APP_PORT`, использовать его. Готовность: [API health](http://localhost:8000/api/health). Swagger: [документация API](http://localhost:8000/docs); её оформление использует CDN.
+
+`compose.real.yaml` запускает `python -m backend --data-dir /app/data/raw --output-dir /app/artifacts`. Вход подключён только для чтения, а результаты сохраняются в отдельном Docker volume. При каждом старте выполняется полный расчёт; уже существующий результат сверяется и остаётся неизменным. Отсутствующий каталог, неверные Parquet или несогласованные суммы останавливают запуск с диагностикой, без подстановки фикстур. В health должен быть `data_ready=true` и `run_id` с префиксом `real-`.
+
+`--wait` ждёт готовности и оставляет контейнер работать в фоне. Лимит 90 секунд относится к запуску, а не скачиванию и сборке. Healthcheck требует загруженный набор и доступный HTML; одного HTTP 200 от health недостаточно.
+
+```sh
+# Проверка HTML/JS/CSS, реальных карточек, графа и всех выгрузок без вызовов AI
+docker compose -f compose.yaml -f compose.real.yaml exec -T app python scripts/real_smoke.py --base-url http://127.0.0.1:8000
+# Состояние и логи
+docker compose -f compose.yaml -f compose.real.yaml ps
+docker compose -f compose.yaml -f compose.real.yaml logs --tail=100 app
+# Остановка с сохранением volume и исходных файлов
+docker compose -f compose.yaml -f compose.real.yaml down
+```
+
+Скачать три CSV можно через меню «Выгрузки». Для независимой проверки схемы и значений внутри контейнера подставить `run_id` из health:
+
+```sh
+docker compose -f compose.yaml -f compose.real.yaml exec -T app python scripts/verify_task_exports.py "/app/artifacts/real-<hash>"
+```
+
+Все команды явно указывают Compose-файлы. Это выбирает нужный режим даже при старом `COMPOSE_FILE` в окружении и одинаково работает на macOS, Linux и Windows. Для сохранения рассчитанных наборов не добавлять `--volumes` к `down`.
+
+## Загрузка готового набора без пересчёта
+
+Нужен каталог с `manifest.json` со статусом `complete` и всеми перечисленными артефактами. Предварительный отчёт `audit_only` не подходит. Если набор ещё не создан, использовать основной запуск выше или выполнить локально:
+
+```sh
+.venv/bin/python -m backend.app.analytics.cli run --input-dir data/raw --output-dir artifacts --rules config/rules.json --mapping config/input_mapping.json
+```
+
+В Windows заменить `.venv/bin/python` на `.venv\Scripts\python.exe`. Команда сообщает `run_dir`. Задать этот путь в локальном `.env`:
+
+```dotenv
+AML_ARTIFACTS_DIR=./artifacts/real-<hash>
+```
+
+Затем:
 
 ```sh
 docker compose -f compose.yaml -f compose.artifacts.yaml up --build --wait --wait-timeout 90
-docker compose -f compose.yaml -f compose.artifacts.yaml logs --tail=100 app
+docker compose -f compose.yaml -f compose.artifacts.yaml exec -T app python scripts/real_smoke.py --base-url http://127.0.0.1:8000
 ```
 
-Каталог монтируется **только для чтения** в `/app/artifacts/run`; в образ и build context исходные данные не включаются. Override выключает фикстуры. Отсутствующий каталог вызывает ошибку монтирования, незаконченный или некорректный набор — `unhealthy` и причину в логах; подмены фикстурами нет. Один образ обслуживает оба режима, баннер определяется заголовком `X-Data-Source` API.
-
-После изменения файлов загруженного набора нужен перезапуск: сервер хранит один снимок в памяти.
+Готовый каталог монтируется только для чтения в `/app/artifacts/run`; расчёт при старте не выполняется. Некорректный набор остаётся неготовым, с причиной в логах. API и CSV обслуживаются из одного снимка в памяти. Для другого результата изменить `AML_ARTIFACTS_DIR` и повторить `up`. Для повторной загрузки того же каталога:
 
 ```sh
 docker compose -f compose.yaml -f compose.artifacts.yaml restart app
 ```
 
-Вернуться к искусственному набору:
+Проверка `real_smoke.py` предназначена для предоставленного набора: в нём есть seed, граница наблюдения и изоляты. Для произвольного другого набора состав проверочных примеров может отличаться.
 
-```sh
-docker compose up --wait --wait-timeout 90
-```
+## AI и локальные настройки
 
-## Настройки и диагностика
+Реальные ключи записываются только в исключённый из Git `.env`. Существующий `.env` дополнить, не перезаписывая; `.env.example` остаётся шаблоном с пустыми секретами. Compose передаёт `OPENAI_API_KEY`, `AI_MODEL`, `AI_PROVIDER`, `AI_TIMEOUT_SECONDS` и `AI_MAX_TOOL_CALLS` серверу. При пустом ключе или модели доступны локальные объяснения.
 
-Необязательные значения в `.env`:
+После изменения `.env` повторить `up`, указав те же Compose-файлы. Команда `restart` не применяет новые переменные контейнера. Ключ не помещать в Compose, Dockerfile, build arguments, frontend или команды терминала. Настройка модели, ограничения и необязательная проверка подключения описаны в [инструкции AI](ai.md).
+
+Другие необязательные настройки:
 
 ```dotenv
 APP_PORT=8001
@@ -64,73 +83,85 @@ APP_MEMORY_LIMIT=2g
 APP_CPUS=2.0
 ```
 
-После изменения выполнить `docker compose up --wait --wait-timeout 90` (добавить оба `-f` для настоящего набора). В примере адрес станет <http://localhost:8001>. Порт публикуется только на `127.0.0.1`; это локальный стенд тестировщика. По умолчанию контейнер ограничен 1 ГБ памяти, 2 CPU и 128 процессами. Store держит набор в памяти, поэтому крупным артефактам может понадобиться больше памяти; производительность на них ещё не измерена.
+В этом примере приложение доступно на [http://localhost:8001](http://localhost:8001). Порт опубликован только на `127.0.0.1`. По умолчанию выделены 1 ГБ памяти, 2 CPU и максимум 128 процессов. Store держит результат в памяти; масштаб до миллиона узлов не измерялся.
+
+## Явный режим искусственных фикстур
+
+Для разработки без исходных данных:
+
+```sh
+docker compose -f compose.yaml up --build --wait --wait-timeout 90
+```
+
+Одиночный `compose.yaml` явно выбирает `fixture-contract-v1`: четыре искусственных узла `0007`, `7`, `0012`, `isolated`. Интерфейс показывает источник данных. Этот режим не выполняет реальный расчёт. AI-настройки из `.env` действуют и здесь; пустые значения дают fallback.
+
+`docker_smoke.py` предназначен только для такого набора и проверяет локальный AI. Его запускать на fixture-сервере, созданном с пустыми `AI_MODEL` и `OPENAI_API_KEY`:
+
+```sh
+docker compose -f compose.yaml exec -T app python scripts/docker_smoke.py
+```
+
+Для настоящего набора использовать `real_smoke.py` из первого раздела. Если после запуска видна синтетика, проверить выбранные `-f`, порт и `run_id` в `/api/health`; затем запустить команду с `compose.real.yaml`.
+
+## Диагностика
 
 | Симптом | Действие |
 |---|---|
-| Cannot connect to the Docker daemon | Запустить Docker Desktop/Engine; на Windows включить Linux containers |
-| Port is already allocated | Задать свободный `APP_PORT` в `.env` и повторить `up` |
-| Ошибка скачивания образа/npm/pip | Проверить интернет, прокси и доступ к реестрам; повторить сборку |
-| Контейнер unhealthy | `docker compose logs --tail=100 app`; проверить артефакты и права чтения |
+| Cannot connect to the Docker daemon | Запустить Docker Desktop/Engine; на Windows выбрать Linux containers |
+| Port is already allocated | Задать свободный `APP_PORT` в `.env` и повторить `up` с нужными `-f` |
+| Ошибка монтирования data/raw | Проверить путь `AML_DATA_DIR`, наличие трёх Parquet и доступ Docker Desktop к каталогу |
+| Контейнер unhealthy или завершился при расчёте | Прочитать `logs --tail=100 app` с теми же `-f`; проверить данные, права и диагностическую ошибку |
 | Код завершения 137 / OOMKilled | Увеличить `APP_MEMORY_LIMIT` и доступную Docker Desktop память |
-| После изменения исходников видна старая версия | Повторить `docker compose up --build --wait --wait-timeout 90` |
+| После изменения исходников осталась старая версия | Повторить `up --build --wait --wait-timeout 90` с теми же `-f` |
+| После изменения AI в `.env` параметры не применились | Повторить `up`, чтобы контейнер был пересоздан; одного `restart` недостаточно |
 
-AI-ключи и локальные `.env` не копируются в образ. Стандартный стенд намеренно работает с локальными объяснениями; живой провайдер требует отдельной конфигурации из [инструкции AI](ai.md), передачи ключа при запуске и выбранной модели. Не добавлять ключ в Dockerfile или build arguments.
-
-## Проверки внутри Docker и CI
+## Проверки кода и CI
 
 ```sh
 docker build --target backend-test -t money-graph:backend-test .
 docker build --target frontend-test -t money-graph:frontend-test .
-docker compose up --build --wait --wait-timeout 90
-docker compose exec -T app python scripts/docker_smoke.py
 ```
 
-Первый target запускает API/AI-тесты и проверку OpenAPI. Второй запускает frontend-тесты и сборку TypeScript/Vite. Тесты не вызывают платный AI. Зависимости берутся из `requirements.lock` и `frontend/package-lock.json`. Аналитический CLI использует отдельные зависимости и в этот веб-образ не включён как готовый pipeline.
+Первый target запускает backend-тесты, включая аналитику и AI, и сверяет OpenAPI. Второй запускает frontend-тесты и сборку TypeScript/Vite. Сетевые ответы AI в тестах имитируются; кредиты не расходуются. Зависимости фиксированы в `requirements.lock` и `frontend/package-lock.json`. Конечный образ содержит полный аналитический pipeline и конфигурацию; исходные Parquet и готовые результаты в образ не включаются.
 
-Workflow `.github/workflows/docker.yml` повторяет эти проверки на Linux x86_64 и формирует отчёт Trivy об исправляемых HIGH/CRITICAL уязвимостях конечного образа. Пока сканирование отчётное: существующий lock содержит Starlette 0.47.3 с известными advisory (например, [CVE-2025-62727](https://github.com/Kludex/starlette/security/advisories/GHSA-7f5h-v6xp-fcq8)); обновление совместимой пары FastAPI/Starlette требует отдельной проверки. Наличие отчёта не означает отсутствие уязвимостей. Образы никуда не публикуются. Результаты workflow появляются после отправки изменений в GitHub; локальная проверка не является запуском CI.
+Workflow `.github/workflows/docker.yml` запускает Docker-проверки на Linux x86_64, fixture smoke без настроенных ключей и отчёт Trivy об исправляемых HIGH/CRITICAL уязвимостях. Сканирование отчётное, без блокировки по найденным уязвимостям; наличие отчёта не означает их отсутствия. Образы workflow не публикует. GitHub Actions для PR №2 не смог начать работу из-за billing-блокировки аккаунта; локальные проверки не выдаются за успешный запуск CI.
 
-Сборка использует Node 24 и Python 3.12 из официальных Debian slim образов. Node и `node_modules` остаются в стадии сборки; конечный образ работает без root, с файловой системой только для чтения и временным `/tmp`. Базовые теги получают обновления внутри выбранной ветки; для передачи строго одинакового образа сохранить его в архив.
+Фактические результаты текущей версии, воспроизводимость и время расчёта приведены в [отчёте реального запуска](real-data-verification.md). Ранние числа 206 API/AI-тестов и 17 frontend-тестов относятся к первой Docker-интеграции на синтетике. Работа AI с API-ключами подтверждена пользователем; отдельный измеренный протокол живого провайдера не записывался.
 
-## Фактическая проверка 23.09.2026
+Сборка использует Node 24 и Python 3.12 из Debian slim образов. Node и `node_modules` остаются в стадии сборки. Приложение работает без root; файловая система контейнера доступна только для чтения, кроме временного `/tmp` и volume результатов в реальном режиме.
 
-Docker Desktop, Linux arm64: образ собран из lock-файлов, **206 API/AI-тестов**, **17 frontend-тестов**, сверка OpenAPI и **16 HTTP smoke-проверок** прошли. Контейнер достиг `healthy`, работает с UID/GID `10001:10001` и read-only файловой системой. В браузере проверены баннер фикстур, поиск `0007`, граф, карточка и локальное AI-объяснение.
+## Передача готового образа
 
-Отдельный временный контейнер проверил загрузку read-only каталога артефактов на искусственной копии набора с тестовым run_id. Неполный каталог оставил `data_ready=false`, без подстановки фикстур, а healthcheck завершился ошибкой. Проверка готовности также прошла при заведомо недоступном HTTP-прокси в окружении. Настоящие данные, живой AI, Linux amd64 и удалённый CI/Trivy в этой локальной проверке не проверялись.
-
-## Передача готового образа без повторной сборки
-
-На машине с той же архитектурой CPU:
+На машине с той же архитектурой CPU сохранить образ:
 
 ```sh
 docker save -o money-graph-image.tar money-graph:local
 ```
 
-Передать архив и `compose.yaml`. Получатель выполняет:
+Передать архив образа, `compose.yaml`, `compose.real.yaml` и отдельно согласованные исходные Parquet. Получатель загружает образ, размещает данные и запускает:
 
 ```sh
 docker load -i money-graph-image.tar
-docker compose up --no-build --wait --wait-timeout 90
+docker compose -f compose.yaml -f compose.real.yaml up --no-build --wait --wait-timeout 90
 ```
 
-Сборка на Apple Silicon создаёт `linux/arm64`, на обычном Windows/Linux x86_64 — `linux/amd64`. Для другой архитектуры получателю проще собрать из исходников; один локальный архив не объявляется универсальным. Для работы с настоящими артефактами также передать `compose.artifacts.yaml` и отдельно согласованный набор данных.
+Для готового расчёта вместо raw-данных передать каталог результата и `compose.artifacts.yaml`, настроить `AML_ARTIFACTS_DIR` и использовать соответствующий override. Локальный `.env` с ключами в передачу не входит. Образ Apple Silicon имеет архитектуру `linux/arm64`, обычного Windows/Linux x86_64 — `linux/amd64`; для другой архитектуры собрать образ на машине получателя.
 
 ## Обновление и откат
 
-Перед пересборкой сохранить текущий рабочий образ:
+Перед пересборкой сохранить рабочий образ и путь к существующему завершённому набору:
 
 ```sh
 docker image tag money-graph:local money-graph:previous
-docker compose up --build --wait --wait-timeout 90
+docker compose -f compose.yaml -f compose.real.yaml up --build --wait --wait-timeout 90
 ```
 
-Если новая сборка не работает, задать `MONEY_GRAPH_IMAGE_TAG=previous` в `.env`, затем:
+Для отката на предыдущий образ с ранее проверенными артефактами задать в `.env` `MONEY_GRAPH_IMAGE_TAG=previous` и `AML_ARTIFACTS_DIR` с путём к этому набору на хосте. Затем:
 
 ```sh
-docker compose up --no-build --wait --wait-timeout 90
-docker compose exec -T app python scripts/docker_smoke.py
+docker compose -f compose.yaml -f compose.artifacts.yaml up --no-build --wait --wait-timeout 90
 ```
 
-Для настоящих артефактов добавить оба `-f` и проверять собственный набор вместо fixture smoke. Для возврата к обновлениям убрать `MONEY_GRAPH_IMAGE_TAG` из `.env`. `docker compose down` удаляет контейнер и его сеть, но сохраняет образы, исходники и подключённые артефакты.
+Проверить health, поиск известного gid и выгрузки. Этот путь не пересчитывает данные кодом предыдущего образа. Если исходный результат хранился только в volume, заранее сохранить каталог на хост командой `docker compose -f compose.yaml -f compose.real.yaml cp "app:/app/artifacts/real-<hash>" ./artifacts/`, подставив настоящий `run_id` и заключив пути с пробелами в кавычки.
 
-Основания: [multi-stage Docker builds](https://docs.docker.com/build/building/multi-stage/), [Compose up и --wait](https://docs.docker.com/reference/cli/docker/compose/up/), [настройки сервисов Compose](https://docs.docker.com/reference/compose-file/services/), [Trivy Action](https://github.com/aquasecurity/trivy-action).
+Для возврата к обновлениям убрать `MONEY_GRAPH_IMAGE_TAG` из `.env` и выполнить основной запуск с `compose.real.yaml`. `down` сохраняет volume, образы, исходники и подключённые артефакты; архив образа и копия прежнего результата позволяют воспроизвести прежнюю версию.
