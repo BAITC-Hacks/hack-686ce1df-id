@@ -204,7 +204,7 @@ async def _read(store: Any, name: str, args: dict[str, Any], run_id: str) -> dic
         raise RequestError("stale_run", 409, "Результат относится к другому запуску.", store.run_id)
     if "contract_version" in result and result["contract_version"] != "1.0":
         raise ToolError("invalid_store_result", "Версия результата не соответствует контракту.")
-    return result
+    return _project_result(name, result)
 
 
 def _fail_result() -> None:
@@ -228,6 +228,99 @@ def _money(value: Any) -> bool:
         return amount.is_finite() and amount >= 0
     except InvalidOperation:
         return False
+
+
+_NODE_FIELDS = (
+    "gid", "component_id", "cluster_id", "role", "role_score", "priority_score",
+    "assignment_status", "metrics", "quality", "role_evidence", "priority_evidence",
+    "role_explanation", "priority_explanation",
+)
+_METRIC_FIELDS = (
+    "in_degree_unique", "out_degree_unique", "tx_in_count", "tx_out_count",
+    "in_amount_kzt", "out_amount_kzt", "out_in_ratio",
+)
+_QUALITY_FIELDS = ("is_seed", "hop_depth", "outbound_censored", "inbound_incomplete", "reasons")
+_EVIDENCE_FIELDS = ("rule_id", "metric", "operator", "actual", "threshold", "passed")
+_CLUSTER_FIELDS = ("cluster_id", "component_id", "gids", "hypothesis")
+_HYPOTHESIS_FIELDS = ("text", "basis_rule_ids", "limitations")
+_GRAPH_FIELDS = ("contract_version", "run_id", "nodes", "edges", "truncated", "total_nodes", "shown_nodes")
+_EDGE_FIELDS = ("source", "target", "amount_kzt", "tx_count")
+_CONCENTRATION_FIELDS = ("gid", "total_out_kzt", "top_receiver_gid", "top_receiver_share", "receiver_count")
+
+
+def _select(record: Any, fields: tuple[str, ...]) -> dict[str, Any]:
+    """Project required contract fields; never forward unknown Store attributes."""
+    if not isinstance(record, dict) or any(field not in record for field in fields):
+        _fail_result()
+    return {field: record[field] for field in fields}
+
+
+def _number(value: Any) -> bool:
+    return type(value) is int or (type(value) is float and math.isfinite(value))
+
+
+def _evidence(record: Any) -> dict[str, Any]:
+    result = _select(record, _EVIDENCE_FIELDS)
+    if (
+        not _identifier(result["rule_id"])
+        or not _identifier(result["metric"])
+        or not isinstance(result["operator"], str)
+        or result["operator"] not in {"gt", "gte", "lt", "lte", "eq"}
+        or type(result["actual"]) not in (str, int, float, bool, type(None))
+        or type(result["threshold"]) not in (str, int, float, bool)
+        or type(result["passed"]) not in (bool, type(None))
+    ):
+        _fail_result()
+    return result
+
+
+def _node(record: Any) -> dict[str, Any]:
+    result = _select(record, _NODE_FIELDS)
+    metrics = _select(result["metrics"], _METRIC_FIELDS)
+    quality = _select(result["quality"], _QUALITY_FIELDS)
+    if (
+        any(not _identifier(result[field]) for field in ("gid", "component_id", "cluster_id"))
+        or not isinstance(result["role"], str)
+        or result["role"] not in {"consolidator", "transit", "distributor", "terminal", "coordinator", "peripheral"}
+        or not isinstance(result["assignment_status"], str)
+        or result["assignment_status"] not in {"rule_matched", "insufficient_evidence"}
+        or any(not _number(result[field]) or not 0 <= result[field] <= 100 for field in ("role_score", "priority_score"))
+        or any(not isinstance(result[field], str) for field in ("role_explanation", "priority_explanation"))
+        or any(not _strict_int(metrics[field]) for field in _METRIC_FIELDS[:4])
+        or any(not _money(metrics[field]) for field in ("in_amount_kzt", "out_amount_kzt"))
+        or (metrics["out_in_ratio"] is not None and not _number(metrics["out_in_ratio"]))
+        or any(type(quality[field]) not in (bool, type(None)) for field in ("is_seed", "outbound_censored", "inbound_incomplete"))
+        or (quality["hop_depth"] is not None and not _strict_int(quality["hop_depth"]))
+        or not _string_list(quality["reasons"])
+    ):
+        _fail_result()
+    for field in ("role_evidence", "priority_evidence"):
+        if not isinstance(result[field], list):
+            _fail_result()
+        result[field] = [_evidence(item) for item in result[field]]
+    result["metrics"] = metrics
+    result["quality"] = quality
+    return result
+
+
+def _project_result(name: str, result: dict[str, Any]) -> dict[str, Any]:
+    """Minimize every nested tool result to the agreed contract v1 fields."""
+    if name == "get_node":
+        return _node(result)
+    if name == "get_cluster":
+        result = _select(result, _CLUSTER_FIELDS)
+        result["hypothesis"] = _select(result["hypothesis"], _HYPOTHESIS_FIELDS)
+        return result
+    if name == "get_neighbors":
+        result = _select(result, _GRAPH_FIELDS)
+        if not isinstance(result["nodes"], list) or not isinstance(result["edges"], list):
+            _fail_result()
+        result["nodes"] = [_node(node) for node in result["nodes"]]
+        result["edges"] = [_select(edge, _EDGE_FIELDS) for edge in result["edges"]]
+        return result
+    if name == "check_concentration":
+        return _select(result, _CONCENTRATION_FIELDS)
+    raise ToolError("unknown_tool", "Модель запросила недоступную функцию.")
 
 
 def _validate_result(name: str, result: dict[str, Any], args: dict[str, Any], run_id: str) -> None:

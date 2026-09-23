@@ -139,6 +139,8 @@ class AIService:
                         continue
                     fragment = validate_response(reply.message, evidence)
                     require_run(store, run_id)
+                    if asyncio.get_running_loop().time() >= deadline:
+                        raise TimeoutError
                     return {"contract_version": "1.0", "run_id": run_id, "status": "ok",
                             "summary": fragment["summary"], "claims": fragment["claims"],
                             "limitations": unique(context.limitations + limits + fragment["limitations"] + [SEMANTIC_LIMITATION]),

@@ -15,6 +15,7 @@ from backend.app.ai.tools import (
     tool_schemas,
     validate_arguments,
 )
+from tests.ai.fixtures import NODE
 
 
 class SyntheticStore:
@@ -24,7 +25,7 @@ class SyntheticStore:
 
     def __init__(self):
         self.calls = []
-        self.nodes = {"0007": {"gid": "0007"}, "7": {"gid": "7"}}
+        self.nodes = {gid: copy.deepcopy(NODE) | {"gid": gid} for gid in ("0007", "7")}
         self.cluster = {
             "cluster_id": "cluster-1",
             "component_id": "component-1",
@@ -212,10 +213,10 @@ class ExecutionTests(unittest.IsolatedAsyncioTestCase):
         ])
 
     async def test_substituted_node_and_concentration_ids_are_rejected(self):
-        self.store.nodes["0007"] = {"gid": "7"}
+        self.store.nodes["0007"] = copy.deepcopy(NODE) | {"gid": "7"}
         with self.assertRaises(ToolError):
             await execute_tool("get_node", {"gid": "0007"}, self.store, self.run_id)
-        self.store.nodes["0007"] = {"gid": "0007"}
+        self.store.nodes["0007"] = copy.deepcopy(NODE)
         self.store.concentration["gid"] = "7"
         with self.assertRaises(ToolError):
             await execute_tool("check_concentration", {"gid": "0007"}, self.store, self.run_id)
@@ -240,8 +241,8 @@ class ExecutionTests(unittest.IsolatedAsyncioTestCase):
         valid_graph = copy.deepcopy(self.store.graph)
         patches = [
             {"contract_version": "2.0"},
-            {"nodes": [{"gid": "7"}], "shown_nodes": 1, "total_nodes": 1, "edges": []},
-            {"nodes": [{"gid": "0007"}, {"gid": "0007"}]},
+            {"nodes": [copy.deepcopy(NODE) | {"gid": "7"}], "shown_nodes": 1, "total_nodes": 1, "edges": []},
+            {"nodes": [copy.deepcopy(NODE), copy.deepcopy(NODE)]},
             {"edges": [{"source": "0007", "target": "missing", "amount_kzt": "1.00", "tx_count": 1}]},
             {"edges": [{"source": "0007", "target": "7", "amount_kzt": "NaN", "tx_count": 1}]},
             {"total_nodes": 3},
@@ -265,11 +266,92 @@ class ExecutionTests(unittest.IsolatedAsyncioTestCase):
 
     async def test_async_store_is_supported(self):
         async def read(gid):
-            return {"gid": gid}
+            return copy.deepcopy(NODE) | {"gid": gid}
 
         self.store.get_node = read
         result = await execute_tool("get_node", {"gid": "0007"}, self.store, self.run_id)
-        self.assertEqual(result, {"gid": "0007"})
+        self.assertEqual(result, NODE)
+
+    async def test_node_unknown_fields_are_removed_recursively(self):
+        expected = copy.deepcopy(self.store.nodes["0007"])
+        record = self.store.nodes["0007"]
+        record["private_profile"] = "TOP_LEVEL_SECRET"
+        record["metrics"]["private_metric"] = "METRIC_SECRET"
+        record["quality"]["private_quality"] = "QUALITY_SECRET"
+        record["priority_evidence"][0]["private_evidence"] = "EVIDENCE_SECRET"
+        record["role_evidence"] = [copy.deepcopy(record["priority_evidence"][0])]
+        expected["role_evidence"] = [copy.deepcopy(expected["priority_evidence"][0])]
+        result = await execute_tool("get_node", {"gid": "0007"}, self.store, self.run_id)
+        self.assertEqual(result, expected)
+        self.assertEqual(record["private_profile"], "TOP_LEVEL_SECRET")
+
+    async def test_cluster_unknown_fields_are_removed_recursively(self):
+        expected = copy.deepcopy(self.store.cluster)
+        self.store.cluster["private_profile"] = "CLUSTER_SECRET"
+        self.store.cluster["hypothesis"]["private_basis"] = "HYPOTHESIS_SECRET"
+        result = await execute_tool("get_cluster", {"cluster_id": "cluster-1"}, self.store, self.run_id)
+        self.assertEqual(result, expected)
+
+    async def test_graph_unknown_fields_are_removed_recursively(self):
+        expected = copy.deepcopy(self.store.graph)
+        self.store.graph["private_graph"] = "GRAPH_SECRET"
+        self.store.graph["nodes"][0]["private_profile"] = "NODE_SECRET"
+        self.store.graph["nodes"][0]["metrics"]["private_metric"] = "METRIC_SECRET"
+        self.store.graph["nodes"][0]["quality"]["private_quality"] = "QUALITY_SECRET"
+        self.store.graph["nodes"][0]["priority_evidence"][0]["private_evidence"] = "EVIDENCE_SECRET"
+        self.store.graph["edges"][0]["private_transfer_note"] = "EDGE_SECRET"
+        result = await execute_tool("get_neighbors", {"gid": "0007"}, self.store, self.run_id)
+        self.assertEqual(result, expected)
+
+    async def test_concentration_unknown_fields_are_removed(self):
+        expected = copy.deepcopy(self.store.concentration)
+        self.store.concentration["private_receiver"] = "CONCENTRATION_SECRET"
+        result = await execute_tool("check_concentration", {"gid": "0007"}, self.store, self.run_id)
+        self.assertEqual(result, expected)
+
+    async def test_missing_required_node_and_nested_fields_are_rejected(self):
+        paths = [
+            ("role",), ("metrics", "out_in_ratio"), ("quality", "outbound_censored"),
+            ("priority_evidence", 0, "threshold"),
+        ]
+        for path in paths:
+            self.store.nodes["0007"] = copy.deepcopy(NODE)
+            record = self.store.nodes["0007"]
+            for key in path[:-1]:
+                record = record[key]
+            del record[path[-1]]
+            with self.subTest(path=path), self.assertRaises(ToolError) as caught:
+                await execute_tool("get_node", {"gid": "0007"}, self.store, self.run_id)
+            self.assertEqual(caught.exception.code, "invalid_store_result")
+
+    async def test_scalar_fields_cannot_smuggle_nested_objects(self):
+        patches = [
+            ("role_explanation", {"private": "SECRET"}),
+            ("role_score", True),
+            ("assignment_status", ["rule_matched"]),
+            ("priority_evidence", [dict(NODE["priority_evidence"][0], actual={"private": "SECRET"})]),
+        ]
+        for field, value in patches:
+            self.store.nodes["0007"] = copy.deepcopy(NODE) | {field: value}
+            with self.subTest(field=field), self.assertRaises(ToolError):
+                await execute_tool("get_node", {"gid": "0007"}, self.store, self.run_id)
+
+    async def test_missing_required_cluster_graph_edge_and_concentration_fields(self):
+        cases = [
+            ("get_cluster", {"cluster_id": "cluster-1"}, "cluster", ("hypothesis", "limitations")),
+            ("get_neighbors", {"gid": "0007"}, "graph", ("shown_nodes",)),
+            ("get_neighbors", {"gid": "0007"}, "graph", ("edges", 0, "tx_count")),
+            ("check_concentration", {"gid": "0007"}, "concentration", ("top_receiver_share",)),
+        ]
+        for name, args, attr, path in cases:
+            self.store = SyntheticStore()
+            record = getattr(self.store, attr)
+            for key in path[:-1]:
+                record = record[key]
+            del record[path[-1]]
+            with self.subTest(name=name, path=path), self.assertRaises(ToolError) as caught:
+                await execute_tool(name, args, self.store, self.run_id)
+            self.assertEqual(caught.exception.code, "invalid_store_result")
 
     async def test_sync_store_read_does_not_block_deadline(self):
         def slow_read(gid):

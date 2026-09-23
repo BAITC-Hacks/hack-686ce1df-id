@@ -168,3 +168,45 @@ class ServiceTests(unittest.IsolatedAsyncioTestCase):
             raise asyncio.CancelledError()
         with self.assertRaises(asyncio.CancelledError):
             await service(FakeProvider(cancelled)).explain(request(), FakeStore())
+
+    async def test_completed_validation_cannot_outlive_deadline(self):
+        def slow_validation(payload, evidence):
+            time.sleep(0.03)
+            return payload
+
+        with patch("backend.app.ai.service.validate_response", side_effect=slow_validation):
+            result = await service(FakeProvider(answer()), timeout_seconds=0.02).explain(request(), FakeStore())
+        self.assertEqual(result["status"], "fallback")
+        self.assertEqual(result["fallback_reason"], "timeout")
+
+    async def test_tool_context_and_trace_do_not_forward_extra_fields(self):
+        store = FakeStore()
+        store.nodes["0007"]["private_extra"] = "never_needed_secret_field"
+        store.nodes["0007"]["quality"]["private_extra"] = "nested_never_needed_field"
+        provider = FakeProvider(ProviderReply(calls=[ToolCall("c1", "get_node", {"gid": "0007"})]), answer())
+        result = await service(provider).investigate(request(question="Проверь"), store)
+        self.assertEqual(result["status"], "ok")
+        self.assertNotIn("never_needed", str(provider.inputs))
+        self.assertNotIn("never_needed", str(result))
+
+    async def test_three_calls_allow_one_final_response_with_tools_disabled(self):
+        calls = [ToolCall(f"c{i}", "get_node", {"gid": "0007"}) for i in range(3)]
+        provider = FakeProvider(ProviderReply(calls=calls), answer())
+        result = await service(provider).investigate(request(question="Проверь"), FakeStore())
+        self.assertEqual(result["status"], "ok")
+        self.assertEqual(len(result["checks"]), 3)
+        self.assertEqual(provider.inputs[1]["tools"], [])
+
+    async def test_tool_limit_applies_across_rounds(self):
+        replies = [ProviderReply(calls=[ToolCall(f"c{i}", "get_node", {"gid": "0007"})]) for i in range(4)]
+        provider = FakeProvider(*replies)
+        result = await service(provider).investigate(request(question="Проверь"), FakeStore())
+        self.assertEqual(result["status"], "fallback")
+        self.assertEqual(len(result["checks"]), 3)
+
+    async def test_partial_batch_failure_keeps_completed_checks(self):
+        calls = [ToolCall("c1", "get_node", {"gid": "0007"}), ToolCall("c2", "get_node", {"gid": "absent"})]
+        result = await service(FakeProvider(ProviderReply(calls=calls))).investigate(request(question="Проверь"), FakeStore())
+        self.assertEqual(result["status"], "fallback")
+        self.assertEqual(result["fallback_reason"], "target_not_found")
+        self.assertEqual(len(result["checks"]), 1)
