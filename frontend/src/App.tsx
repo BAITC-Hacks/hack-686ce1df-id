@@ -20,9 +20,11 @@ export default function App() {
   const selectComponent = (id: string) => void workspace.select({ kind: 'component', id });
   const scopeLabel = selection.scope ? `${selection.scope.kind === 'node' ? 'Окружение узла' : selection.scope.kind === 'cluster' ? 'Кластер' : 'Компонента'} ${selection.scope.id}` : 'Выберите область исследования';
   const target = selection.node ? { kind: 'node' as const, id: selection.node.gid } : selection.cluster ? { kind: 'cluster' as const, id: selection.cluster.cluster_id } : null;
-  const fixtureMode = dataset?.dataSource != null
-    ? dataset.dataSource === 'fixtures'
-    : import.meta.env.VITE_DATA_SOURCE === 'fixture';
+  const dataSource = dataset?.dataSource ?? 'unknown';
+  const fixtureMode = dataSource === 'fixtures' || (dataSource === 'unknown' && import.meta.env.VITE_DATA_SOURCE === 'fixture');
+  const sourceLabel = fixtureMode ? 'Искусственные тестовые данные'
+    : dataSource === 'artifacts' ? 'Источник: результаты расчёта'
+      : dataSource === 'unavailable' ? 'Источник данных недоступен' : 'Источник данных не указан';
 
   return <div className="application">
     <a className="skip-link" href="#gid-search">Перейти к поиску</a>
@@ -34,7 +36,7 @@ export default function App() {
     <div className="run-bar">
       <span className={`connection-status ${dataset ? 'is-ready' : ''}`}><i />{loading ? 'Подключение к данным' : dataset ? 'Расчёт загружен' : 'Нет подключения к данным'}</span>
       <span className="run-identity">{dataset ? <>Расчёт <strong title={dataset.runId}>{dataset.runId}</strong></> : 'Ожидаем завершённый расчёт'}</span>
-      <span className="source-label">{fixtureMode ? 'Искусственные тестовые данные' : 'Источник: локальный API'}</span>
+      <span className="source-label">{sourceLabel}</span>
     </div>
     {fixtureMode ? <div className="notice fixture-notice"><Info size={16} />Режим проверки интерфейса. Данные искусственные и не являются результатами анализа кейса.</div> : null}
     {notice ? <div className="notice" role="status"><Info size={16} />{notice}</div> : null}
@@ -54,16 +56,16 @@ export default function App() {
         <div className="navigation-footer"><CircleHelp size={16} /><p>Сначала выберите узел.<br />Затем проверьте связи и основания.</p></div>
       </aside>
       <GraphPanel graph={selection.graph} selectedGid={selectedGid} loading={selection.loading || loading} onSelectNode={selectNode} radius={radius} onRadiusChange={workspace.changeRadius} scopeLabel={scopeLabel} error={selection.error || error} onRetry={() => selection.scope && dataset ? void workspace.select(selection.scope) : void workspace.refresh()} />
-      <aside className="details-panel" aria-label="Карточка и AI-помощник" aria-busy={selection.loading}>
+      <aside className="details-panel" aria-label="Карточка и AI-помощник" aria-busy={selection.loading && !target}>
         <div className="details-panel-heading"><FileSearch size={17} /><h2>Детали исследования</h2>{target ? <span className="small-tag">{target.kind === 'node' ? 'Узел' : 'Кластер'}</span> : null}</div>
         <div className="details-content">
-          {selection.loading ? <div className="panel-status" role="status"><LoaderCircle className="spin" size={24} /><p>Загружаем карточку…</p></div> : selection.node ? <NodeDetails node={selection.node} onSelectCluster={selectCluster} onSelectComponent={selectComponent} /> : selection.cluster ? <ClusterDetails cluster={selection.cluster} onSelectNode={selectNode} onSelectComponent={selectComponent} /> : <div className="details-empty">
+          {selection.loading && !target ? <div className="panel-status" role="status"><LoaderCircle className="spin" size={24} /><p>Загружаем карточку…</p></div> : selection.node ? <NodeDetails node={selection.node} onSelectCluster={selectCluster} onSelectComponent={selectComponent} /> : selection.cluster ? <ClusterDetails cluster={selection.cluster} onSelectNode={selectNode} onSelectComponent={selectComponent} /> : <div className="details-empty">
             <span className="detail-empty-icon"><FileSearch size={29} strokeWidth={1.4} /></span>
             <h2>{selection.scope?.kind === 'component' && !selection.error ? `Компонента ${selection.scope.id}` : 'От связей к основаниям'}</h2>
             <p>{selection.error || (selection.scope?.kind === 'component' ? 'Выберите узел на графе, чтобы изучить его роль и основания приоритета.' : 'Найдите узел по gid или выберите его в списке. Здесь появятся роль, показатели и объяснение расчёта.')}</p>
             <div className="empty-flow"><span><Network size={16} />Связи</span><span><Activity size={16} />Показатели</span><span><FileSearch size={16} />Основания</span></div>
           </div>}
-          {target && dataset && !selection.loading ? <AiPanel key={`${dataset.runId}:${target.kind}:${target.id}`} runId={dataset.runId} target={target} onRunConflict={workspace.onRunConflict} /> : null}
+          {target && dataset ? <AiPanel key={`${dataset.runId}:${target.kind}:${target.id}`} runId={dataset.runId} target={target} onRunConflict={workspace.onRunConflict} /> : null}
         </div>
       </aside>
     </main>

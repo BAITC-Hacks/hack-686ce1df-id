@@ -185,10 +185,10 @@ export const api = {
     const source = headers.get('X-Data-Source');
     return { ...data, dataSource: source === 'fixtures' || source === 'artifacts' || source === 'unavailable' ? source : null };
   },
-  node: (gid: string, signal?: AbortSignal) => request<NodeResponse>(`/nodes/${encodedId(gid)}`, { signal }),
+  node: (gid: string, signal?: AbortSignal) => request<NodeResponse>(`/node?${new URLSearchParams({ gid: requireId(gid) })}`, { signal }),
   priorities: (signal?: AbortSignal) => request<PrioritiesResponse>('/priorities?limit=20&offset=0', { signal }),
   clusters: (signal?: AbortSignal) => request<ClustersResponse>('/clusters', { signal }),
-  cluster: (id: string, signal?: AbortSignal) => request<ClusterResponse>(`/clusters/${encodedId(id)}`, { signal }),
+  cluster: (id: string, signal?: AbortSignal) => request<ClusterResponse>(`/cluster?${new URLSearchParams({ cluster_id: requireId(id) })}`, { signal }),
   graph: (query: GraphQuery, signal?: AbortSignal) => request<GraphResponse>(`/graph?${graphSearch(query)}`, { signal }),
   explain: (runId: string, target: Target, signal?: AbortSignal) => aiRequest('explain', runId, target, signal),
   investigate: (runId: string, target: Target, question: string, signal?: AbortSignal) => aiRequest('investigate', runId, target, signal, question),

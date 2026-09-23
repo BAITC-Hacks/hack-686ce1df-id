@@ -54,6 +54,8 @@
 - `audit.json` — проверки схемы, ссылочной целостности, сверки таблиц, ограничений выборки и фактические количества.
 - `manifest.json` — RunManifest. Записывается последним и отмечает завершённый набор.
 
+Для семи файлов данных `manifest.files` принимает логические ключи `nodes`, `edges`, `clusters`, `priorities`, `roles`, `rules`, `audit` либо соответствующие имена файлов с расширением. API всегда предоставляет их логические имена для выгрузки и сохраняет доступ по всем явно перечисленным ключам. Если указаны оба варианта ключа, они должны ссылаться на один относительный путь. Имя выгрузки `manifest` зарезервировано для точных байтов загруженного `manifest.json`; запись в `files` необязательна, а явный ключ `manifest` должен указывать на этот же файл. Байты всех выгрузок фиксируются при загрузке набора.
+
 Измерение времени начинается до чтения parquet и заканчивается после закрытия manifest.json; окончательное значение времени фиксируется в stdout и отчёте бенчмарка. `elapsed_seconds` в manifest отражает время до его финальной записи. Идентификатор запуска связан с входом и конфигурацией; один законченный набор результатов неизменяем.
 
 Необходимые поля из parquet явно сопоставляются в `config/input_mapping.json` после изучения реальной схемы. Отсутствующая требуемая колонка останавливает запуск с именем файла и поля. Конкретные названия исходных колонок сейчас неизвестны.
@@ -76,18 +78,22 @@ FastAPI/Pydantic-модели — единый источник схем HTTP; `
 | Метод и путь | Параметры | Ответ |
 |---|---|---|
 | `GET /api/health` | — | `{status:"ok", contract_version:"1.0", run_id:string|null, data_ready:boolean}` |
-| `GET /api/nodes/{gid}` | точный gid | `{contract_version,run_id,node:NodeRecord}` |
+| `GET /api/node` | обязательный query-параметр `gid`, точная непустая строка | `{contract_version,run_id,node:NodeRecord}` |
+| `GET /api/nodes/{gid}` | совместимый поиск по пути, включая `/` внутри gid | `{contract_version,run_id,node:NodeRecord}` |
 | `GET /api/priorities` | `limit=20`, `offset=0` | `{contract_version,run_id,items:NodeRecord[],total:integer}` |
 | `GET /api/clusters` | — | `{contract_version,run_id,items:ClusterRecord[]}` |
-| `GET /api/clusters/{cluster_id}` | — | `{contract_version,run_id,cluster:ClusterRecord}` |
+| `GET /api/cluster` | обязательный query-параметр `cluster_id`, точная непустая строка | `{contract_version,run_id,cluster:ClusterRecord}` |
+| `GET /api/clusters/{cluster_id}` | совместимый поиск по пути, включая `/` внутри ID | `{contract_version,run_id,cluster:ClusterRecord}` |
 | `GET /api/graph` | ровно один из `gid/cluster_id/component_id`; `radius=1` или 2 для gid; `limit=300` (1–300) | `{contract_version,run_id,nodes:NodeRecord[],edges:EdgeRecord[],truncated:boolean,total_nodes:integer,shown_nodes:integer}` |
-| `GET /api/exports/{name}` | разрешённое имя из manifest.files | файл текущего запуска |
+| `GET /api/exports/{name}` | логическое имя обязательного артефакта, `manifest` или точный ключ manifest.files | точные байты файла текущего запуска |
 | `POST /api/ai/explain` | `{run_id,target:{kind:"node"|"cluster",id:string}}` | AIResponse |
 | `POST /api/ai/investigate` | тот же target и `question:string` | AIResponse |
 
 Граф окружения обходит наблюдаемые связи в обе стороны для навигации и сохраняет направления отображаемых рёбер. Радиус относится к выбранному узлу, а не к исходным четырём коленам. При отсечении выбранный узел сохраняется; остальные выбираются по расстоянию, priority_score убыванию, gid. Показываются только рёбра между показанными узлами. Карточные метрики всегда взяты из полного расчёта, а не пересчитаны на отфильтрованном экране. `total_nodes` — размер выбранной области до ограничения отображения.
 
-Ошибка JSON: `{error:{code:string,message:string},run_id:string|null}`. Неизвестный gid/cluster — 404; нет законченного запуска — 503; некорректные параметры — 422; устаревший run_id AI-запроса — 409. Экспорт принимает имя из списка, а не произвольный путь.
+Для произвольных строковых идентификаторов клиент использует query-маршруты `/api/node?gid=…` и `/api/cluster?cluster_id=…`: сегменты `.`/`..`, слеши, Unicode и знаки URL остаются частью значения. Маршруты с ID в пути сохранены для совместимости, но браузер может нормализовать сегменты с точками до отправки запроса.
+
+Ошибка JSON: `{error:{code:string,message:string},run_id:string|null}`. Неизвестный gid/cluster — 404; нет законченного запуска — 503; некорректные параметры, включая отсутствующий или пустой ID query-поиска, — 422; устаревший run_id AI-запроса — 409. Экспорт принимает имя из разрешённого списка, а не произвольный путь.
 
 ## AIResponse и функции: владелец D, интеграция B
 

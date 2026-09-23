@@ -3,6 +3,7 @@ WORKDIR /build/frontend
 COPY frontend/package.json frontend/package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY frontend/ ./
+COPY tests/fixtures/contract-v1/ /build/tests/fixtures/contract-v1/
 RUN npm run build
 
 FROM frontend-build AS frontend-test

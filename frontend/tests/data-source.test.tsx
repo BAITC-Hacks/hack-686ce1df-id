@@ -50,7 +50,7 @@ describe('runtime data source for a reusable frontend build', () => {
 
     expect(screen.queryByText(fixtureNotice) !== null).toBe(showsFixture);
     expect(screen.queryByText('Искусственные тестовые данные') !== null).toBe(showsFixture);
-    expect(screen.queryByText('Источник: локальный API') !== null).toBe(!showsFixture);
+    if (!showsFixture) expect(screen.getByText(source === 'artifacts' ? 'Источник: результаты расчёта' : 'Источник данных не указан')).toBeTruthy();
   });
 
   it('refreshes the source and removes the previous fixture warning', async () => {
@@ -63,7 +63,7 @@ describe('runtime data source for a reusable frontend build', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Обновить набор данных' }));
     await waitFor(() => expect(screen.queryByText(fixtureNotice)).toBeNull());
     await screen.findByText('Расчёт загружен');
-    expect(screen.getByText('Источник: локальный API')).toBeTruthy();
+    expect(screen.getByText('Источник: результаты расчёта')).toBeTruthy();
 
     setSource('fixtures');
     fireEvent.click(screen.getByRole('button', { name: 'Обновить набор данных' }));

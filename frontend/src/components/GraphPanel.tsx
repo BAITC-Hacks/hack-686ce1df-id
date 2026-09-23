@@ -1,8 +1,8 @@
-import { useEffect, useId, useRef } from 'react';
-import cytoscape, { type Core, type ElementDefinition, type EventObject } from 'cytoscape';
+import { useEffect, useId, useRef, useState } from 'react';
+import type { Core, ElementDefinition, EventObject } from 'cytoscape';
 import { ArrowRight, Expand, LoaderCircle, Minus, Network, Plus, RotateCcw } from 'lucide-react';
 import type { GraphResponse } from '../types/api';
-import { ROLE_COLORS, ROLE_LABELS } from '../format';
+import { ROLE_COLORS, ROLE_LABELS, formatMoney } from '../format';
 
 interface GraphPanelProps {
   graph: GraphResponse | null;
@@ -20,6 +20,41 @@ const roles = ['consolidator', 'transit', 'distributor', 'terminal', 'coordinato
 const nodeId = (gid: string) => `node:${gid}`;
 const edgeId = (source: string, target: string) => `edge:${JSON.stringify([source, target])}`;
 const compareIds = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+const EDGE_PAGE_SIZE = 25;
+
+function GraphEdges({ graph, disabled, onSelectNode }: {
+  graph: GraphResponse;
+  disabled: boolean;
+  onSelectNode: (gid: string) => void;
+}) {
+  const [page, setPage] = useState(0);
+  const lastPage = Math.max(0, Math.ceil(graph.edges.length / EDGE_PAGE_SIZE) - 1);
+  const currentPage = Math.min(page, lastPage);
+  const start = currentPage * EDGE_PAGE_SIZE;
+  const edges = graph.edges.slice(start, start + EDGE_PAGE_SIZE);
+
+  return <details className="graph-edge-list">
+    <summary>Связи в текстовом виде</summary>
+    {edges.length === 0 ? <p className="empty-note">В показанной области нет связей.</p> : <>
+      <div className="graph-edge-table-wrap">
+        <table className="graph-edge-table">
+          <caption>Направленные связи показанной области</caption>
+          <thead><tr><th scope="col">Отправитель</th><th scope="col">Получатель</th><th scope="col">Сумма</th><th scope="col">Переводов</th></tr></thead>
+          <tbody>{edges.map((edge) => <tr key={edgeId(edge.source, edge.target)}>
+            <td><button type="button" className="text-button" disabled={disabled} aria-label={`Открыть отправителя ${edge.source}`} onClick={() => onSelectNode(edge.source)}>{edge.source}</button></td>
+            <td><button type="button" className="text-button" disabled={disabled} aria-label={`Открыть получателя ${edge.target}`} onClick={() => onSelectNode(edge.target)}>{edge.target}</button></td>
+            <td>{formatMoney(edge.amount_kzt)}</td><td>{edge.tx_count.toLocaleString('ru-RU')}</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+      <div className="graph-edge-pagination" role="group" aria-label="Страницы списка связей">
+        <button type="button" className="button button-secondary" disabled={disabled || currentPage === 0} onClick={() => setPage(currentPage - 1)}>Назад</button>
+        <p aria-live="polite">Связи {start + 1}–{start + edges.length} из {graph.edges.length}</p>
+        <button type="button" className="button button-secondary" disabled={disabled || currentPage === lastPage} onClick={() => setPage(currentPage + 1)}>Далее</button>
+      </div>
+    </>}
+  </details>;
+}
 
 /** A finite, deterministic layout: 100 small force steps, with no running simulation. */
 function positionsFor(graph: GraphResponse): Map<string, { x: number; y: number }> {
@@ -87,10 +122,14 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
   const topologyRef = useRef<string | null>(null);
   const onSelectRef = useRef(onSelectNode);
   const disabledRef = useRef(loading || Boolean(error));
+  const [renderer, setRenderer] = useState<Core | null>(null);
+  const [rendererError, setRendererError] = useState(false);
+  const [rendererAttempt, setRendererAttempt] = useState(0);
   const selectorId = useId();
   const headingId = useId();
   const hasNodes = Boolean(graph?.nodes.length);
-  const unavailable = loading || Boolean(error) || !hasNodes;
+  const rendererLoading = hasNodes && !renderer && !rendererError;
+  const unavailable = loading || Boolean(error) || !hasNodes || !renderer;
 
   useEffect(() => {
     onSelectRef.current = onSelectNode;
@@ -99,103 +138,119 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
 
   useEffect(() => {
     const container = canvasRef.current;
-    if (!container) return;
-    const cy = cytoscape({
-      container,
-      elements: [],
-      layout: { name: 'preset' },
-      minZoom: 0.08,
-      maxZoom: 3,
-      autounselectify: true,
-      boxSelectionEnabled: false,
-      style: [
-        {
-          selector: 'node',
-          style: {
-            width: 23,
-            height: 23,
-            'background-color': 'data(color)',
-            'border-width': 3,
-            'border-color': '#ffffff',
-            label: '',
-            color: '#243655',
-            'font-size': 12,
-            'font-family': 'Arial, sans-serif',
-            'font-weight': 600,
-            'text-valign': 'bottom',
-            'text-margin-y': 10,
-            'text-background-color': '#ffffff',
-            'text-background-opacity': 0.95,
-            'text-background-padding': '4px',
-            'overlay-opacity': 0,
+    if (!container || !hasNodes) return;
+    let disposed = false;
+    let disposeRenderer: (() => void) | undefined;
+    setRendererError(false);
+    // Keep the graph engine out of the initial request; an empty workspace needs no canvas renderer.
+    void import('cytoscape').then(({ default: cytoscape }) => {
+      if (disposed) return;
+      const cy = cytoscape({
+        container,
+        elements: [],
+        layout: { name: 'preset' },
+        minZoom: 0.08,
+        maxZoom: 3,
+        autounselectify: true,
+        boxSelectionEnabled: false,
+        style: [
+          {
+            selector: 'node',
+            style: {
+              width: 23,
+              height: 23,
+              'background-color': 'data(color)',
+              'border-width': 3,
+              'border-color': '#ffffff',
+              label: '',
+              color: '#243655',
+              'font-size': 12,
+              'font-family': 'Arial, sans-serif',
+              'font-weight': 600,
+              'text-valign': 'bottom',
+              'text-margin-y': 10,
+              'text-background-color': '#ffffff',
+              'text-background-opacity': 0.95,
+              'text-background-padding': '4px',
+              'overlay-opacity': 0,
+            },
           },
-        },
-        {
-          selector: 'edge',
-          style: {
-            width: 1.5,
-            'line-color': '#bdcbdc',
-            'target-arrow-color': '#9aadc6',
-            'target-arrow-shape': 'triangle',
-            'arrow-scale': 0.8,
-            'curve-style': 'bezier',
-            opacity: 0.8,
-            'overlay-opacity': 0,
+          {
+            selector: 'edge',
+            style: {
+              width: 1.5,
+              'line-color': '#bdcbdc',
+              'target-arrow-color': '#9aadc6',
+              'target-arrow-shape': 'triangle',
+              'arrow-scale': 0.8,
+              'curve-style': 'bezier',
+              opacity: 0.8,
+              'overlay-opacity': 0,
+            },
           },
-        },
-        {
-          selector: 'node.is-selected',
-          style: {
-            width: 32,
-            height: 32,
-            label: 'data(gid)',
-            'border-width': 4,
-            'border-color': '#254edb',
-            'outline-color': '#dce6ff',
-            'outline-width': 7,
-            'outline-opacity': 0.65,
-            'z-index': 10,
+          {
+            selector: 'node.is-selected',
+            style: {
+              width: 32,
+              height: 32,
+              label: 'data(gid)',
+              'border-width': 4,
+              'border-color': '#254edb',
+              'outline-color': '#dce6ff',
+              'outline-width': 7,
+              'outline-opacity': 0.65,
+              'z-index': 10,
+            },
           },
-        },
-        {
-          selector: 'node.is-hovered',
-          style: { label: 'data(gid)', 'border-color': '#7189b5', 'z-index': 20 },
-        },
-        {
-          selector: 'edge.is-adjacent',
-          style: { width: 2, 'line-color': '#829cca', 'target-arrow-color': '#6c88b9', opacity: 1 },
-        },
-      ],
+          {
+            selector: 'node.is-hovered',
+            style: { label: 'data(gid)', 'border-color': '#7189b5', 'z-index': 20 },
+          },
+          {
+            selector: 'edge.is-adjacent',
+            style: { width: 2, 'line-color': '#829cca', 'target-arrow-color': '#6c88b9', opacity: 1 },
+          },
+        ],
+      });
+      cyRef.current = cy;
+      const select = (event: EventObject) => {
+        if (!disabledRef.current) onSelectRef.current(event.target.data('gid') as string);
+      };
+      const enter = (event: EventObject) => {
+        if (disabledRef.current) return;
+        event.target.addClass('is-hovered');
+        container.style.cursor = 'pointer';
+      };
+      const leave = (event: EventObject) => {
+        event.target.removeClass('is-hovered');
+        container.style.cursor = '';
+      };
+      cy.on('tap', 'node', select);
+      cy.on('mouseover', 'node', enter);
+      cy.on('mouseout', 'node', leave);
+      const resizeObserver = new ResizeObserver(() => cy.resize());
+      resizeObserver.observe(container);
+
+      disposeRenderer = () => {
+        resizeObserver.disconnect();
+        cy.off('tap', 'node', select);
+        cy.off('mouseover', 'node', enter);
+        cy.off('mouseout', 'node', leave);
+        cy.destroy();
+      };
+      setRenderer(cy);
+    }).catch(() => {
+      if (!disposed) setRendererError(true);
     });
-    cyRef.current = cy;
-    const select = (event: EventObject) => {
-      if (!disabledRef.current) onSelectRef.current(event.target.data('gid') as string);
-    };
-    const enter = (event: EventObject) => {
-      if (disabledRef.current) return;
-      event.target.addClass('is-hovered');
-      container.style.cursor = 'pointer';
-    };
-    const leave = (event: EventObject) => {
-      event.target.removeClass('is-hovered');
-      container.style.cursor = '';
-    };
-    cy.on('tap', 'node', select);
-    cy.on('mouseover', 'node', enter);
-    cy.on('mouseout', 'node', leave);
-    const resizeObserver = new ResizeObserver(() => cy.resize());
-    resizeObserver.observe(container);
 
     return () => {
-      resizeObserver.disconnect();
-      cy.off('tap', 'node', select);
-      cy.off('mouseover', 'node', enter);
-      cy.off('mouseout', 'node', leave);
-      cy.destroy();
+      disposed = true;
+      disposeRenderer?.();
       cyRef.current = null;
       topologyRef.current = null;
+      setRenderer(null);
     };
-  }, []);
+  }, [hasNodes, rendererAttempt]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -233,7 +288,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
     topologyRef.current = topology;
     cy.resize();
     fitGraph(cy);
-  }, [graph]);
+  }, [graph, renderer]);
 
   useEffect(() => {
     const cy = cyRef.current;
@@ -247,7 +302,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
         selected.connectedEdges().addClass('is-adjacent');
       }
     });
-  }, [selectedGid, graph]);
+  }, [selectedGid, graph, renderer]);
 
   const zoomBy = (factor: number) => {
     const cy = cyRef.current;
@@ -259,7 +314,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
   };
 
   return (
-    <section className="graph-panel" aria-labelledby={headingId} aria-busy={loading}>
+    <section className="graph-panel" aria-labelledby={headingId} aria-busy={loading || rendererLoading}>
       <header className="graph-header">
         <div>
           <h2 id={headingId}>Наблюдаемые связи</h2>
@@ -278,7 +333,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
       </header>
       <div className="graph-stage">
         <div ref={canvasRef} className="graph-canvas" role="img"
-          aria-label={graph ? `Направленный граф. Узлов: ${graph.shown_nodes}, связей: ${graph.edges.length}. Выбор с клавиатуры доступен в списке под графом.` : 'Область графа. Данные ещё не загружены.'}
+          aria-label={graph ? `Направленный граф. Узлов: ${graph.shown_nodes}, связей: ${graph.edges.length}. Выбор узлов и текстовое описание направленных связей доступны под графом.` : 'Область графа. Данные ещё не загружены.'}
           aria-hidden={unavailable} />
         {!unavailable ? (
           <>
@@ -296,6 +351,10 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
           <div className="graph-overlay" role="alert"><Network size={30} aria-hidden="true" /><h3>Граф недоступен</h3><p>{error}</p><button className="button button-secondary" type="button" onClick={onRetry}><RotateCcw size={15} aria-hidden="true" />Повторить</button></div>
         ) : !hasNodes ? (
           <div className="graph-overlay"><div className="graph-empty-symbol"><Network size={42} strokeWidth={1.25} aria-hidden="true" /></div><h3>{graph ? 'В выбранной области нет узлов' : 'Каждое исследование начинается с узла'}</h3><p>{graph ? 'Выберите другой узел, кластер или компоненту.' : 'Найдите точный gid или выберите узел в списке приоритетов, чтобы увидеть его связи.'}</p></div>
+        ) : rendererError ? (
+          <div className="graph-overlay" role="alert"><Network size={30} aria-hidden="true" /><h3>Не удалось отобразить граф</h3><p>Повторите попытку или обновите страницу. Список узлов и связей доступен ниже.</p><button className="button button-secondary" type="button" onClick={() => setRendererAttempt((attempt) => attempt + 1)}><RotateCcw size={15} aria-hidden="true" />Повторить отображение</button></div>
+        ) : rendererLoading ? (
+          <div className="graph-overlay" role="status"><LoaderCircle className="spin" size={26} aria-hidden="true" /><h3>Подготавливаем граф…</h3></div>
         ) : null}
       </div>
       <div className="graph-legend" aria-label="Легенда ролей">
@@ -318,6 +377,7 @@ export function GraphPanel({ graph, selectedGid, loading, onSelectNode, radius, 
             </select>
           </details>
         ) : null}
+        {graph && hasNodes ? <GraphEdges key={`${graph.run_id}:${scopeLabel}:${radius}`} graph={graph} disabled={loading || Boolean(error)} onSelectNode={onSelectNode} /> : null}
       </footer>
     </section>
   );

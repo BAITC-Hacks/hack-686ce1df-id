@@ -97,6 +97,70 @@ afterEach(() => {
 });
 
 describe('workspace selection across asynchronous API responses', () => {
+  it('keeps the current card during a radius refresh and ignores the active radius', async () => {
+    const { result } = await readyWorkspace();
+    await act(async () => { await result.current.select({ kind: 'node', id: '0007' }); });
+    const card = result.current.selection.node;
+    const graph = deferred<GraphResponse>();
+    vi.mocked(api.graph).mockReturnValueOnce(graph.promise);
+
+    act(() => result.current.changeRadius(1));
+    expect(api.graph).toHaveBeenCalledTimes(1);
+    act(() => result.current.changeRadius(2));
+    expect(result.current.selection.loading).toBe(true);
+    expect(result.current.selection.node).toBe(card);
+    expect(api.graph).toHaveBeenLastCalledWith({ gid: '0007', radius: 2, limit: 300 }, expect.any(AbortSignal));
+
+    await act(async () => { graph.resolve(graphResponse('0007')); });
+    expect(result.current.selection.loading).toBe(false);
+    expect(result.current.selection.node?.gid).toBe('0007');
+    act(() => result.current.changeRadius(2));
+    expect(api.graph).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a known card after a transient refresh failure but clears it for another target', async () => {
+    const { result } = await readyWorkspace();
+    await act(async () => { await result.current.select({ kind: 'node', id: '0007' }); });
+    const card = result.current.selection.node;
+    vi.mocked(api.graph).mockRejectedValueOnce(new ApiError('Сеть недоступна', 0, 'NETWORK_ERROR'));
+    await act(async () => result.current.changeRadius(2));
+    expect(result.current.selection.node).toBe(card);
+    expect(result.current.selection.graph).toBeNull();
+    expect(result.current.selection.error).toBe('Сеть недоступна');
+
+    const graph = deferred<GraphResponse>();
+    vi.mocked(api.graph).mockReturnValueOnce(graph.promise);
+    let request!: Promise<void>;
+    act(() => { request = result.current.select({ kind: 'node', id: '0008' }); });
+    expect(result.current.selection.node).toBeNull();
+    await act(async () => { graph.resolve(graphResponse('0008')); await request; });
+    expect(result.current.selection.node?.gid).toBe('0008');
+  });
+
+  it('does not expose the previous graph when another target fails to load', async () => {
+    const { result } = await readyWorkspace();
+    await act(async () => { await result.current.select({ kind: 'node', id: '0007' }); });
+    vi.mocked(api.graph).mockRejectedValueOnce(new ApiError('Сеть недоступна', 0, 'NETWORK_ERROR'));
+    await act(async () => { await result.current.select({ kind: 'node', id: '0008' }); });
+    expect(result.current.selection.scope).toEqual({ kind: 'node', id: '0008' });
+    expect(result.current.selection.node).toBeNull();
+    expect(result.current.selection.cluster).toBeNull();
+    expect(result.current.selection.graph).toBeNull();
+    expect(result.current.selection.error).toBe('Сеть недоступна');
+  });
+
+  it('associates the source reported by health with the loaded run', async () => {
+    vi.mocked(api.health).mockResolvedValueOnce({ ...healthResponse(), dataSource: 'fixtures' });
+    const { result } = await readyWorkspace();
+    expect(result.current.dataset?.dataSource).toBe('fixtures');
+    vi.mocked(api.health).mockResolvedValueOnce({ ...healthResponse(NEXT_RUN), dataSource: 'artifacts' });
+    vi.mocked(api.priorities).mockResolvedValueOnce({ contract_version: '1.0', run_id: NEXT_RUN, items: [], total: 0 });
+    vi.mocked(api.clusters).mockResolvedValueOnce({ contract_version: '1.0', run_id: NEXT_RUN, items: [] });
+    await act(async () => { await result.current.refresh(); });
+    expect(result.current.dataset?.runId).toBe(NEXT_RUN);
+    expect(result.current.dataset?.dataSource).toBe('artifacts');
+  });
+
   it('keeps B selected when a transport ignores abort and returns A late', async () => {
     const nodeA = deferred<NodeResponse>();
     const graphA = deferred<GraphResponse>();
