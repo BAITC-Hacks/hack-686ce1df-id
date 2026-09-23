@@ -169,6 +169,18 @@ npm --prefix frontend run build
 
 ## Контекст и планы
 
+Комплект сдачи и его проверка описаны в [инструкции комплекта](docs/submission.md).
+Для защиты подготовлен [сценарий демо на 3–5 минут](docs/demo-script.md).
+Архив собирается локально из чистой закоммиченной версии:
+
+```sh
+.venv/bin/python scripts/package_submission.py --run-dir "artifacts/<run_id>" --verification data/audit/submission-csv-verification.json
+```
+
+Протокол `--verification` должен относиться к этому же расчёту и содержать
+результат `verify_task_exports.py`; в текущем комплекте он дополнен итогами
+Docker и воспроизводимости. Архивы находятся в игнорируемом `submission/`.
+
 - [Архитектура](docs/superpowers/specs/2026-09-23-money-graph-design.md)
 - [Контракт данных и API v1](docs/contracts/money-graph-v1.md)
 - [Общий план команды](docs/superpowers/plans/2026-09-23-money-graph-parallel.md)
