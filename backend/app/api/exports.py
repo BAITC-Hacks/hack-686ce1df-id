@@ -7,7 +7,7 @@ from backend.app.api.dependencies import CurrentStore
 router = APIRouter(tags=["exports"])
 
 
-@router.get("/exports/{name}", response_class=Response, responses={200: {"description": "Immutable file from the current manifest.files allowlist."}})
+@router.get("/exports/{name}", response_class=Response, responses={200: {"description": "Immutable artifact by canonical logical name or an exact manifest.files key; manifest returns the loaded manifest.json bytes."}})
 def get_export(name: str, store: CurrentStore) -> Response:
     artifact = store.get_export(name)
     return Response(

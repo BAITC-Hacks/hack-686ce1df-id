@@ -236,6 +236,8 @@ class ResultStore:
             if not name or name in {".", ".."} or any(char in name for char in "/\\:\x00"):
                 raise StoreLoadError(f"Unsafe export name: {name!r}")
             path = _safe_artifact_path(directory, relative)
+            if name == "manifest" and path != manifest_path:
+                raise StoreLoadError("The reserved export name 'manifest' must refer to manifest.json")
             before = path.stat()
             content = path.read_bytes()
             fingerprints[path] = (before.st_size, before.st_mtime_ns, before.st_ino)
@@ -254,6 +256,11 @@ class ResultStore:
             if len(candidates) > 1 and manifest.files[candidates[0]] != manifest.files[candidates[1]]:
                 raise StoreLoadError(f"Ambiguous manifest.files aliases for {logical!r}")
             required[logical] = contents[candidates[0]]
+            # Stable UI export names also work with filename-keyed manifests.
+            exports[logical] = exports[candidates[0]]
+
+        # Export the exact validated startup file, including its original formatting.
+        exports["manifest"] = ExportArtifact("manifest.json", manifest_bytes, "application/json")
 
         nodes = _records(required["nodes"], "nodes.json", NodeRecord)
         edges = _records(required["edges"], "edges.json", EdgeRecord)
@@ -440,7 +447,7 @@ class ResultStore:
         )
 
     def get_export(self, name: str) -> ExportArtifact:
-        """Return only a manifest-listed export, using its startup bytes."""
+        """Return an allowlisted artifact, canonical alias, or the startup manifest."""
         if name not in self._exports:
             raise RecordNotFoundError(f"Unknown export: {name}")
         return self._exports[name]
