@@ -1,0 +1,27 @@
+# Keep host dependencies, credentials and datasets out of the build context.
+**/.git
+**/.DS_Store
+**/.venv*
+**/node_modules
+**/dist
+**/build
+**/__pycache__
+**/.pytest_cache
+**/.ruff_cache
+**/*.egg-info
+**/*.py[cod]
+**/*.tsbuildinfo
+**/coverage
+**/htmlcov
+**/.coverage*
+**/.env
+**/.env.*
+**/*.pem
+**/*.key
+**/*.parquet
+data
+artifacts
+.agents
+.codex
+docs
+.github

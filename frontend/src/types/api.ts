@@ -76,6 +76,13 @@ export interface HealthResponse {
   data_ready: boolean;
 }
 
+export type DataSource = 'fixtures' | 'artifacts' | 'unavailable';
+
+/** Client metadata from response headers; not part of the health JSON contract. */
+export interface HealthResult extends HealthResponse {
+  dataSource: DataSource | null;
+}
+
 export interface NodeResponse extends ResponseEnvelope {
   node: NodeRecord;
 }

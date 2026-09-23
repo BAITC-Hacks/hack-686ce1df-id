@@ -5,6 +5,7 @@ import type {
   GraphQuery,
   GraphResponse,
   HealthResponse,
+  HealthResult,
   NodeResponse,
   PrioritiesResponse,
   Target,
@@ -51,7 +52,7 @@ interface RequestOptions {
   allowNullRunId?: boolean;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+async function requestWithHeaders<T>(path: string, options: RequestOptions = {}): Promise<{ data: T; headers: Headers }> {
   const controller = new AbortController();
   const abort = () => controller.abort();
   let timedOut = false;
@@ -111,7 +112,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
       );
     }
 
-    return data as T;
+    return { data: data as T, headers: response.headers };
   } catch (error) {
     if (options.signal?.aborted) throw new DOMException('Запрос отменён.', 'AbortError');
     if (timedOut) {
@@ -123,6 +124,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     clearTimeout(timer);
     options.signal?.removeEventListener('abort', abort);
   }
+}
+
+async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return (await requestWithHeaders<T>(path, options)).data;
 }
 
 function graphSearch(query: GraphQuery): string {
@@ -175,7 +180,11 @@ async function aiRequest(
 }
 
 export const api = {
-  health: (signal?: AbortSignal) => request<HealthResponse>('/health', { signal, allowNullRunId: true }),
+  health: async (signal?: AbortSignal): Promise<HealthResult> => {
+    const { data, headers } = await requestWithHeaders<HealthResponse>('/health', { signal, allowNullRunId: true });
+    const source = headers.get('X-Data-Source');
+    return { ...data, dataSource: source === 'fixtures' || source === 'artifacts' || source === 'unavailable' ? source : null };
+  },
   node: (gid: string, signal?: AbortSignal) => request<NodeResponse>(`/nodes/${encodedId(gid)}`, { signal }),
   priorities: (signal?: AbortSignal) => request<PrioritiesResponse>('/priorities?limit=20&offset=0', { signal }),
   clusters: (signal?: AbortSignal) => request<ClustersResponse>('/clusters', { signal }),

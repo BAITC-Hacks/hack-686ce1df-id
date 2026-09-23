@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { api, ApiError } from '../src/api/client';
 import { formatMoney, formatNumber, formatValue } from '../src/format';
 import { useWorkspace } from '../src/state/useWorkspace';
-import type { GraphResponse, HealthResponse, NodeRecord, NodeResponse } from '../src/types/api';
+import type { GraphResponse, HealthResult, NodeRecord, NodeResponse } from '../src/types/api';
 
 const INITIAL_RUN = 'synthetic-test-run-1';
 const NEXT_RUN = 'synthetic-test-run-2';
@@ -59,8 +59,8 @@ function graphResponse(gid: string, runId = INITIAL_RUN): GraphResponse {
   };
 }
 
-function healthResponse(runId = INITIAL_RUN): HealthResponse {
-  return { status: 'ok', contract_version: '1.0', run_id: runId, data_ready: true };
+function healthResponse(runId = INITIAL_RUN): HealthResult {
+  return { status: 'ok', contract_version: '1.0', run_id: runId, data_ready: true, dataSource: 'fixtures' };
 }
 
 function deferred<T>() {
@@ -142,7 +142,7 @@ describe('workspace selection across asynchronous API responses', () => {
       expect(result.current.selection.node?.gid).toBe('old-node');
 
       // Pause refresh to observe that old data disappears before the new run arrives.
-      const nextHealth = deferred<HealthResponse>();
+      const nextHealth = deferred<HealthResult>();
       vi.mocked(api.health).mockReturnValueOnce(nextHealth.promise);
       vi.mocked(api.priorities).mockResolvedValue({
         contract_version: '1.0', run_id: NEXT_RUN, items: [makeNode('fresh-node')], total: 1,

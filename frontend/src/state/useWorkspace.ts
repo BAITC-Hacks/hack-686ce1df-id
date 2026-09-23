@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
-import type { ClusterRecord, GraphResponse, NodeRecord } from '../types/api';
+import type { ClusterRecord, DataSource, GraphResponse, NodeRecord } from '../types/api';
 
 export type Scope = { kind: 'node' | 'cluster' | 'component'; id: string };
-type Dataset = { runId: string; priorities: NodeRecord[]; clusters: ClusterRecord[]; total: number };
+type Dataset = { runId: string; dataSource: DataSource | null; priorities: NodeRecord[]; clusters: ClusterRecord[]; total: number };
 type Selection = {
   scope: Scope | null;
   node: NodeRecord | null;
@@ -57,7 +57,7 @@ export function useWorkspace() {
         throw new Error('Во время загрузки изменился расчёт. Обновите набор данных.');
       }
       run.current = health.run_id;
-      setDataset({ runId: health.run_id, priorities: priorities.items, clusters: clusters.items, total: priorities.total });
+      setDataset({ runId: health.run_id, dataSource: health.dataSource, priorities: priorities.items, clusters: clusters.items, total: priorities.total });
     } catch (cause) {
       if (controller.signal.aborted || ticket !== bootGeneration.current) return;
       setError(cause instanceof Error ? cause.message : errorMessage(cause));

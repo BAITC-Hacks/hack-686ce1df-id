@@ -20,7 +20,9 @@ export default function App() {
   const selectComponent = (id: string) => void workspace.select({ kind: 'component', id });
   const scopeLabel = selection.scope ? `${selection.scope.kind === 'node' ? 'Окружение узла' : selection.scope.kind === 'cluster' ? 'Кластер' : 'Компонента'} ${selection.scope.id}` : 'Выберите область исследования';
   const target = selection.node ? { kind: 'node' as const, id: selection.node.gid } : selection.cluster ? { kind: 'cluster' as const, id: selection.cluster.cluster_id } : null;
-  const fixtureMode = import.meta.env.VITE_DATA_SOURCE === 'fixture';
+  const fixtureMode = dataset?.dataSource != null
+    ? dataset.dataSource === 'fixtures'
+    : import.meta.env.VITE_DATA_SOURCE === 'fixture';
 
   return <div className="application">
     <a className="skip-link" href="#gid-search">Перейти к поиску</a>

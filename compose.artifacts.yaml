@@ -1,0 +1,13 @@
+# Use together with compose.yaml. The source must be an existing complete run.
+services:
+  app:
+    environment:
+      AML_FIXTURE_MODE: "false"
+      AML_RUN_DIR: /app/artifacts/run
+    volumes:
+      - type: bind
+        source: ${AML_ARTIFACTS_DIR:?Set AML_ARTIFACTS_DIR to an existing completed run directory}
+        target: /app/artifacts/run
+        read_only: true
+        bind:
+          create_host_path: false
