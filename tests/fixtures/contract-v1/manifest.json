@@ -1,0 +1,31 @@
+{
+  "contract_version": "1.0",
+  "run_id": "fixture-contract-v1",
+  "status": "complete",
+  "input_hashes": {},
+  "rules_hash": "7a3cbd71f45e70f6a0b6e9ef1cbc7fe5966628a16016d7f4e78f2c883de0bb5b",
+  "counts": {
+    "nodes": 4,
+    "edges": 2,
+    "clusters": 2
+  },
+  "elapsed_seconds": 0,
+  "stage_seconds": {},
+  "random_seed": 0,
+  "versions": {
+    "fixture": "1.0"
+  },
+  "files": {
+    "nodes": "nodes.json",
+    "edges": "edges.json",
+    "clusters": "clusters.json",
+    "priorities": "priorities.csv",
+    "roles": "roles.csv",
+    "rules": "rules.json",
+    "audit": "audit.json",
+    "ai_response": "ai_response.json"
+  },
+  "warnings": [
+    "ARTIFICIAL DEVELOPMENT FIXTURE: no production input or analytics calculation; manually supplied scores and hypotheses."
+  ]
+}

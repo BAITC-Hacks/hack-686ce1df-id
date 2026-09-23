@@ -1,0 +1,126 @@
+[
+  {
+    "gid": "0007",
+    "component_id": "component-main",
+    "cluster_id": "cluster-main",
+    "role": "peripheral",
+    "role_score": 0,
+    "priority_score": 50,
+    "assignment_status": "insufficient_evidence",
+    "metrics": {
+      "in_degree_unique": 0,
+      "out_degree_unique": 1,
+      "tx_in_count": 0,
+      "tx_out_count": 1,
+      "in_amount_kzt": "0.00",
+      "out_amount_kzt": "100.00",
+      "out_in_ratio": null
+    },
+    "quality": {
+      "is_seed": true,
+      "hop_depth": 0,
+      "outbound_censored": false,
+      "inbound_incomplete": true,
+      "reasons": [
+        "Искусственный seed: наблюдение входящих неполное."
+      ]
+    },
+    "role_evidence": [],
+    "priority_evidence": [],
+    "role_explanation": "Недостаточно наблюдаемых данных для более специфической роли. Искусственная фикстура для проверки контракта.",
+    "priority_explanation": "Искусственная фикстура: приоритет задан вручную для проверки порядка API; аналитическая формула не применялась."
+  },
+  {
+    "gid": "7",
+    "component_id": "component-main",
+    "cluster_id": "cluster-main",
+    "role": "peripheral",
+    "role_score": 0,
+    "priority_score": 90,
+    "assignment_status": "insufficient_evidence",
+    "metrics": {
+      "in_degree_unique": 1,
+      "out_degree_unique": 1,
+      "tx_in_count": 1,
+      "tx_out_count": 1,
+      "in_amount_kzt": "100.00",
+      "out_amount_kzt": "80.00",
+      "out_in_ratio": 0.8
+    },
+    "quality": {
+      "is_seed": false,
+      "hop_depth": 1,
+      "outbound_censored": null,
+      "inbound_incomplete": null,
+      "reasons": [
+        "Искусственная фикстура: полнота наблюдения неизвестна."
+      ]
+    },
+    "role_evidence": [],
+    "priority_evidence": [],
+    "role_explanation": "Недостаточно наблюдаемых данных для более специфической роли. Искусственная фикстура для проверки контракта.",
+    "priority_explanation": "Искусственная фикстура: приоритет задан вручную для проверки порядка API; аналитическая формула не применялась."
+  },
+  {
+    "gid": "0012",
+    "component_id": "component-main",
+    "cluster_id": "cluster-main",
+    "role": "peripheral",
+    "role_score": 0,
+    "priority_score": 70,
+    "assignment_status": "insufficient_evidence",
+    "metrics": {
+      "in_degree_unique": 1,
+      "out_degree_unique": 0,
+      "tx_in_count": 1,
+      "tx_out_count": 0,
+      "in_amount_kzt": "80.00",
+      "out_amount_kzt": "0.00",
+      "out_in_ratio": 0
+    },
+    "quality": {
+      "is_seed": false,
+      "hop_depth": 4,
+      "outbound_censored": true,
+      "inbound_incomplete": null,
+      "reasons": [
+        "Искусственная граница обхода: ноль исходящих не доказывает конечное получение."
+      ]
+    },
+    "role_evidence": [],
+    "priority_evidence": [],
+    "role_explanation": "Недостаточно наблюдаемых данных для более специфической роли. Искусственная фикстура для проверки контракта.",
+    "priority_explanation": "Искусственная фикстура: приоритет задан вручную для проверки порядка API; аналитическая формула не применялась."
+  },
+  {
+    "gid": "isolated",
+    "component_id": "component-isolated",
+    "cluster_id": "cluster-isolated",
+    "role": "peripheral",
+    "role_score": 0,
+    "priority_score": 0,
+    "assignment_status": "insufficient_evidence",
+    "metrics": {
+      "in_degree_unique": 0,
+      "out_degree_unique": 0,
+      "tx_in_count": 0,
+      "tx_out_count": 0,
+      "in_amount_kzt": "0.00",
+      "out_amount_kzt": "0.00",
+      "out_in_ratio": null
+    },
+    "quality": {
+      "is_seed": null,
+      "hop_depth": null,
+      "outbound_censored": null,
+      "inbound_incomplete": null,
+      "reasons": [
+        "Искусственный изолированный узел: происхождение и полнота наблюдения неизвестны."
+      ]
+    },
+    "role_evidence": [],
+    "priority_evidence": [],
+    "role_explanation": "Недостаточно наблюдаемых данных для более специфической роли. Искусственная фикстура для проверки контракта.",
+    "priority_explanation": "Искусственная фикстура: приоритет задан вручную для проверки порядка API; аналитическая формула не применялась."
+  }
+]

@@ -1,0 +1,12 @@
+{
+  "fixture_only": true,
+  "description": "Artificial development fixture, not a production analytics audit.",
+  "counts": {
+    "nodes": 4,
+    "edges": 2,
+    "clusters": 2
+  },
+  "warnings": [
+    "All explanations and priorities are artificial. No source parquet was processed."
+  ]
+}

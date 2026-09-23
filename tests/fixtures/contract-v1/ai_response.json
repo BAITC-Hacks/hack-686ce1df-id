@@ -1,0 +1,12 @@
+{
+  "contract_version": "1.0",
+  "run_id": "fixture-contract-v1",
+  "status": "fallback",
+  "summary": "Искусственная локальная справка для узла 0007; модель не вызывалась.",
+  "claims": [],
+  "limitations": [
+    "Искусственные данные разработки; не использовать для проверки реальных клиентов."
+  ],
+  "checks": [],
+  "fallback_reason": "Artificial contract fixture; no AI provider was called."
+}

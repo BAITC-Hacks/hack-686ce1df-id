@@ -1,0 +1,1 @@
+"""Money Graph Python package."""

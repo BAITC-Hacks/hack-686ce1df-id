@@ -1,0 +1,2 @@
+# Keep hashed fixture JSON byte-identical after Windows/Linux checkouts.
+* text=auto eol=lf
