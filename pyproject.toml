@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools==84.0.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "money-graph"
+version = "0.1.0"
+description = "Local API for reproducible transaction graph investigations"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi==0.116.1",
+  "httpx==0.28.1",
+  "pydantic==2.13.5",
+  "python-dotenv==1.1.1",
+  "uvicorn==0.35.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest==8.4.2"]
+
+[project.scripts]
+money-graph = "backend.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["backend*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests/api", "tests/ai"]
+addopts = "-ra"

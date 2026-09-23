@@ -1,0 +1,32 @@
+[
+  {
+    "cluster_id": "cluster-main",
+    "component_id": "component-main",
+    "gids": [
+      "0007",
+      "7",
+      "0012"
+    ],
+    "hypothesis": {
+      "text": "Искусственная фикстура: три связанных узла для проверки навигации API.",
+      "basis_rule_ids": [],
+      "limitations": [
+        "Принадлежность задана вручную; аналитическая кластеризация не выполнялась."
+      ]
+    }
+  },
+  {
+    "cluster_id": "cluster-isolated",
+    "component_id": "component-isolated",
+    "gids": [
+      "isolated"
+    ],
+    "hypothesis": {
+      "text": "Искусственная фикстура: кластер одного изолированного узла.",
+      "basis_rule_ids": [],
+      "limitations": [
+        "Пустое наблюдаемое окружение не является выводом о поведении клиента."
+      ]
+    }
+  }
+]

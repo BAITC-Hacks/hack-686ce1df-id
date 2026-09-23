@@ -1,0 +1,14 @@
+[
+  {
+    "source": "0007",
+    "target": "7",
+    "amount_kzt": "100.00",
+    "tx_count": 1
+  },
+  {
+    "source": "7",
+    "target": "0012",
+    "amount_kzt": "80.00",
+    "tx_count": 1
+  }
+]

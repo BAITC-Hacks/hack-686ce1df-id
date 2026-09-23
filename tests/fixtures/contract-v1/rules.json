@@ -1,0 +1,9 @@
+{
+  "fixture_only": true,
+  "description": "Artificial supplied values for HTTP contract tests. No analytics formulas are approved or implemented by this fixture.",
+  "rules": [],
+  "priority": {
+    "source": "hand-authored artificial scores, not a calculation"
+  },
+  "self_transfers": "No self-transfers are present in this artificial fixture."
+}
