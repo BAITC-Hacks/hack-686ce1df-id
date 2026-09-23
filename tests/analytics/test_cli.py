@@ -61,7 +61,7 @@ def test_audit_publishes_metrics_and_never_claims_complete(source, tmp_path, cap
     assert cli.main(["audit", "--input-dir", str(raw), "--mapping", str(mapping_path),
                      "--self-transfers", "include", "--output", str(output)]) == 0
     summary = json.loads(capsys.readouterr().out)
-    report = json.loads(output.read_text())
+    report = json.loads(output.read_text(encoding="utf-8"))
     assert summary["elapsed_seconds"] >= report["elapsed_seconds_before_report"]
     assert report["status"] == "audit_only"
     assert report["dataset_kind"] == "synthetic"
@@ -85,7 +85,7 @@ def test_reconciliation_error_persists_diagnostics(source, tmp_path, capsys):
     output = tmp_path / "failed-audit.json"
     assert cli.main(["audit", "--input-dir", str(raw), "--mapping", str(mapping_path),
                      "--self-transfers", "include", "--output", str(output)]) == 2
-    failure = json.loads(output.read_text())
+    failure = json.loads(output.read_text(encoding="utf-8"))
     assert failure["status"] == "failed"
     assert failure["audit"]["reconciliation"]["mismatch_count"] == 1
     assert json.loads(capsys.readouterr().err)["status"] == "failed"
@@ -96,7 +96,7 @@ def test_existing_output_is_never_replaced(source, tmp_path, capsys):
     output = tmp_path / "existing.json"
     output.write_text("user content", encoding="utf-8")
     assert cli.main(["inspect", "--input-dir", str(raw), "--output", str(output)]) == 2
-    assert output.read_text() == "user content"
+    assert output.read_text(encoding="utf-8") == "user content"
     assert json.loads(capsys.readouterr().err)["status"] == "failed"
     assert list(tmp_path.glob(".existing.json.*")) == []
 
