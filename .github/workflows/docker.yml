@@ -1,0 +1,44 @@
+name: Docker checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose
+        run: docker compose config --quiet
+      - name: Backend tests and OpenAPI contract
+        run: docker build --target backend-test -t money-graph:backend-test .
+      - name: Frontend tests and production build
+        run: docker build --target frontend-test -t money-graph:frontend-test .
+      - name: Start tester application
+        run: docker compose up --build --wait --wait-timeout 90
+      - name: Smoke test UI, API, exports and local AI
+        run: docker compose exec -T app python scripts/docker_smoke.py
+      - name: Report runtime image vulnerabilities
+        uses: aquasecurity/trivy-action@v0.36.0
+        with:
+          image-ref: money-graph:local
+          format: table
+          # Existing dependency pins have advisories; report the baseline without
+          # blocking unrelated packaging checks. Scanner errors still fail CI.
+          exit-code: '0'
+          ignore-unfixed: true
+          vuln-type: os,library
+          severity: CRITICAL,HIGH
+      - name: Container logs
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop tester application
+        if: always()
+        run: docker compose down

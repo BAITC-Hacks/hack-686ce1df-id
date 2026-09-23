@@ -1,0 +1,37 @@
+name: money-graph
+
+services:
+  app:
+    image: money-graph:${MONEY_GRAPH_IMAGE_TAG:-local}
+    build:
+      context: .
+      target: runtime
+    ports:
+      - "127.0.0.1:${APP_PORT:-8000}:8000"
+    environment:
+      # Explicit tester mode; the host's local backend .env cannot change it.
+      AML_FIXTURE_MODE: "true"
+      AML_RUN_DIR: ""
+      AML_FRONTEND_DIST: /app/frontend/dist
+      # The default tester session is local and never makes paid AI requests.
+      AI_PROVIDER: openai
+      AI_MODEL: ""
+      OPENAI_API_KEY: ""
+      AI_TIMEOUT_SECONDS: "30"
+      AI_MAX_TOOL_CALLS: "3"
+    init: true
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 128
+    mem_limit: ${APP_MEMORY_LIMIT:-1g}
+    cpus: ${APP_CPUS:-2.0}
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
