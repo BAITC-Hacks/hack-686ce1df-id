@@ -7,6 +7,8 @@ from urllib.parse import urlsplit
 
 from dotenv import load_dotenv
 
+from backend.app.ai.provider import AIConfig, ConfigError
+
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIXTURE_DIR = PROJECT_ROOT / "tests" / "fixtures" / "contract-v1"
 
@@ -52,6 +54,13 @@ class Settings:
         run_dir = os.getenv("AML_RUN_DIR", "")
         demo_dir = os.getenv("AML_DEMO_DIR", "")
         frontend_dist = os.getenv("AML_FRONTEND_DIST", "")
+        try:
+            ai_timeout_seconds = AIConfig.from_env().timeout_seconds
+        except ConfigError:
+            # Keep the local API available. Leave the environment untouched so
+            # the AI service reports invalid_configuration instead of calling
+            # the provider with silently repaired settings.
+            ai_timeout_seconds = AIConfig().timeout_seconds
         values = {
             "run_dir": Path(run_dir) if run_dir else None,
             "fixture_mode": fixture_mode in {"true", "1"},
@@ -59,7 +68,7 @@ class Settings:
             "demo_dir": Path(demo_dir) if demo_dir else None,
             "frontend_dist": Path(frontend_dist) if frontend_dist else PROJECT_ROOT / "frontend" / "dist",
             "frontend_origin": os.getenv("AML_FRONTEND_ORIGIN", "http://localhost:5173"),
-            "ai_timeout_seconds": float(os.getenv("AI_TIMEOUT_SECONDS", "30")),
+            "ai_timeout_seconds": ai_timeout_seconds,
         }
         # Explicit CLI source selection replaces environment source fields
         # before validation, including mutually exclusive environment modes.

@@ -87,7 +87,9 @@ export function useWorkspace() {
     const controller = new AbortController();
     selectionRequest.current = controller;
     const ticket = ++generation.current;
-    setSelection(previous => ({ ...emptySelection, scope, graph: previous.graph, loading: true }));
+    setSelection(previous => previous.scope?.kind === scope.kind && previous.scope.id === scope.id
+      ? { ...previous, loading: true, error: null }
+      : { ...emptySelection, scope, graph: previous.graph, loading: true });
     const current = () => !controller.signal.aborted && ticket === generation.current && run.current === expectedRun;
     try {
       const query = scope.kind === 'node'
@@ -119,7 +121,9 @@ export function useWorkspace() {
       const message = cause instanceof ApiError && cause.status === 404
         ? `${scope.kind === 'node' ? 'Узел' : 'Объект'} «${scope.id}» не найден. Проверьте идентификатор.`
         : cause instanceof Error ? cause.message : errorMessage(cause);
-      setSelection({ ...emptySelection, scope, error: message });
+      setSelection(previous => cause instanceof ApiError && cause.status === 404
+        ? { ...emptySelection, scope, error: message }
+        : { ...previous, graph: null, loading: false, error: message });
       return false;
     }
   }, [radius, onRunConflict]);
@@ -131,6 +135,7 @@ export function useWorkspace() {
   }, [refresh, select]);
 
   const changeRadius = (value: 1 | 2) => {
+    if (value === radius) return;
     setRadius(value);
     if (selection.scope?.kind === 'node') void select(selection.scope, value);
   };

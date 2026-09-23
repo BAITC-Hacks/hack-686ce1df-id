@@ -91,6 +91,91 @@
             "required": true,
             "schema": {
               "type": "string",
+              "minLength": 1,
+              "title": "Gid"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NodeResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifier or export not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale run_id or conflicting demo request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No completed run available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/node": {
+      "get": {
+        "tags": [
+          "nodes"
+        ],
+        "summary": "Lookup Node",
+        "description": "Look up an opaque ID without browser normalization of URL path segments.",
+        "operationId": "lookup_node_api_node_get",
+        "parameters": [
+          {
+            "name": "gid",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
               "title": "Gid"
             }
           }
@@ -339,6 +424,91 @@
             "required": true,
             "schema": {
               "type": "string",
+              "minLength": 1,
+              "title": "Cluster Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ClusterResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Demo editing is disabled",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Identifier or export not found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Stale run_id or conflicting demo request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Invalid request",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "No completed run available",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/cluster": {
+      "get": {
+        "tags": [
+          "clusters"
+        ],
+        "summary": "Lookup Cluster",
+        "description": "Keep slashes and dot segments inside the exact identifier.",
+        "operationId": "lookup_cluster_api_cluster_get",
+        "parameters": [
+          {
+            "name": "cluster_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
               "title": "Cluster Id"
             }
           }
@@ -575,7 +745,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Immutable file from the current manifest.files allowlist."
+            "description": "Immutable artifact by canonical logical name or an exact manifest.files key; manifest returns the loaded manifest.json bytes."
           },
           "403": {
             "description": "Demo editing is disabled",

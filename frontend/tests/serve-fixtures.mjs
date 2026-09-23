@@ -239,12 +239,16 @@ async function readBody(request) {
 }
 
 const server = createServer(async (request, response) => {
+  response.setHeader('X-Data-Source', 'fixtures');
+  response.setHeader('X-Contract-Version', '1.0');
+  response.setHeader('X-Run-Id', RUN_ID);
   try {
     const url = new URL(request.url, 'http://127.0.0.1:8010');
     const path = decodeURIComponent(url.pathname);
     if (request.method === 'GET') {
       if (path === '/api/demo') return json(response, 200, envelope({ enabled: false, node_count: nodes.length, transfer_count: null, nodes: [], groups: [], limits: { date_from: '2026-07-01', date_to: '2026-07-31', min_amount_kzt: '5000.00', max_amount_kzt: '1000000000000.00' } }));
       if (path === '/api/health') return json(response, 200, envelope({ status: 'ok', data_ready: true }));
+      if (path === '/api/node') return json(response, 200, envelope({ node: required(nodeById, url.searchParams.get('gid'), 'Узел') }));
       if (path.startsWith('/api/nodes/')) return json(response, 200, envelope({ node: required(nodeById, path.slice(11), 'Узел') }));
       if (path === '/api/priorities') {
         const limit = integerParam(url.searchParams, 'limit', 20, 1, 1000);
@@ -252,6 +256,7 @@ const server = createServer(async (request, response) => {
         return json(response, 200, envelope({ items: priorities.slice(offset, offset + limit), total: nodes.length }));
       }
       if (path === '/api/clusters') return json(response, 200, envelope({ items: clusters }));
+      if (path === '/api/cluster') return json(response, 200, envelope({ cluster: required(clusterById, url.searchParams.get('cluster_id'), 'Кластер') }));
       if (path.startsWith('/api/clusters/')) return json(response, 200, envelope({ cluster: required(clusterById, path.slice(14), 'Кластер') }));
       if (path === '/api/graph') return json(response, 200, graphResponse(url.searchParams));
       if (path.startsWith('/api/exports/')) {

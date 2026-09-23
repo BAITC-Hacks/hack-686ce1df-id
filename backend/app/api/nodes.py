@@ -3,14 +3,20 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from backend.app.api.dependencies import CurrentStore
-from backend.app.contracts import NodeResponse, PrioritiesResponse
+from backend.app.contracts import Identifier, NodeResponse, PrioritiesResponse
 
 router = APIRouter(tags=["nodes"])
 
 
-@router.get("/nodes/{gid}", response_model=NodeResponse)
-def get_node(gid: str, store: CurrentStore) -> NodeResponse:
+@router.get("/nodes/{gid:path}", response_model=NodeResponse)
+def get_node(gid: Identifier, store: CurrentStore) -> NodeResponse:
     return NodeResponse(run_id=store.run_id, node=store.get_node(gid))
+
+
+@router.get("/node", response_model=NodeResponse)
+def lookup_node(gid: Annotated[str, Query(min_length=1)], store: CurrentStore) -> NodeResponse:
+    """Look up an opaque ID without browser normalization of URL path segments."""
+    return get_node(gid, store)
 
 
 @router.get("/priorities", response_model=PrioritiesResponse)
